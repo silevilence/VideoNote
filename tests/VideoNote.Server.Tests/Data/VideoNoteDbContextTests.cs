@@ -79,20 +79,20 @@ public sealed class VideoNoteDbContextTests
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        var saved = await context.PromptTemplates.SingleAsync();
+        var saved = await context.PromptTemplates.SingleAsync(p => p.Id == template.Id);
         Assert.Equal("提取视频中的关键结论。", saved.Content);
 
         saved.Content = "提取关键结论并说明依据。";
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        saved = await context.PromptTemplates.SingleAsync();
+        saved = await context.PromptTemplates.SingleAsync(p => p.Id == template.Id);
         Assert.Equal("提取关键结论并说明依据。", saved.Content);
 
         context.PromptTemplates.Remove(saved);
         await context.SaveChangesAsync();
 
-        Assert.Empty(await context.PromptTemplates.ToListAsync());
+        Assert.False(await context.PromptTemplates.AnyAsync(p => p.Id == template.Id));
     }
 
     [Fact]
@@ -236,7 +236,7 @@ public sealed class VideoNoteDbContextTests
         context.ChangeTracker.Clear();
 
         context.Providers.Remove(await context.Providers.SingleAsync());
-        context.PromptTemplates.Remove(await context.PromptTemplates.SingleAsync());
+        context.PromptTemplates.Remove(await context.PromptTemplates.SingleAsync(p => p.Id == template.Id));
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
@@ -246,7 +246,7 @@ public sealed class VideoNoteDbContextTests
         Assert.Equal("A report that must remain.", savedTask.ResultText);
         Assert.Empty(await context.Providers.ToListAsync());
         Assert.Empty(await context.ModelConfigs.ToListAsync());
-        Assert.Empty(await context.PromptTemplates.ToListAsync());
+        Assert.False(await context.PromptTemplates.AnyAsync(p => p.Id == template.Id));
     }
 
     [Fact]

@@ -18,6 +18,8 @@ public sealed class AnalysisTask
 
     public string? StageDescription { get; set; }
 
+    public string? PromptContentSnapshot { get; set; }
+
     public string? ResultText { get; set; }
 
     public string? ErrorMessage { get; set; }

@@ -46,6 +46,7 @@ public sealed class VideoNoteDbContext(DbContextOptions<VideoNoteDbContext> opti
         promptTemplate.HasKey(item => item.Id);
         promptTemplate.Property(item => item.Name).HasMaxLength(200).IsRequired();
         promptTemplate.Property(item => item.Content).IsRequired();
+        promptTemplate.HasData(BuiltInPrompts.Create());
 
         var analysisTask = modelBuilder.Entity<AnalysisTask>();
         analysisTask.ToTable("AnalysisTasks");

@@ -1,0 +1,66 @@
+@page "/prompts"
+@inherits OperationPage
+@inject ApiClient Api
+@inject IJSRuntime JS
+@using VideoNote.Shared.Contracts
+@using VideoNote.Client.Components
+@using VideoNote.Client.Services
+
+<PageTitle>提示词模板 · VideoNote</PageTitle>
+<h1>提示词模板</h1>
+<p>内置模板只读。复制后可以自由编辑；任务保存后会保留当时的提示词内容。</p>
+@if (Error is not null) { <div class="alert alert-danger" role="alert">@Error</div> }
+@if (Busy) { <p role="status">正在处理…</p> }
+<button class="btn btn-primary mb-3" disabled="@Busy" @onclick="New">新建模板</button>
+<button class="btn btn-outline-secondary mb-3 ms-2" disabled="@Busy" @onclick="() => Run(Load)">刷新</button>
+@if (prompts.Count == 0 && !Busy) { <p>暂无模板。</p> }
+<div class="table-responsive"><table class="table"><thead><tr><th>名称</th><th>来源</th><th>操作</th></tr></thead><tbody>
+@foreach (var p in prompts)
+{
+    <tr @key="p.Id"><td>@p.Name</td><td>@(p.IsBuiltIn ? "内置" : "自建")</td><td>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@Busy" @onclick="() => View(p)">查看</button>
+        <button class="btn btn-sm btn-outline-primary" disabled="@Busy" @onclick="() => Copy(p)">复制</button>
+        @if (!p.IsBuiltIn)
+        {
+            <button class="btn btn-sm btn-outline-secondary" disabled="@Busy" @onclick="() => Edit(p)">编辑</button>
+            <button class="btn btn-sm btn-outline-danger" disabled="@Busy" @onclick="() => Delete(p)">删除</button>
+        }
+    </td></tr>
+}
+</tbody></table></div>
+@if (viewed is not null) { <section class="border rounded p-3 mb-3"><h2>@viewed.Name</h2><pre class="text-wrap">@viewed.Content</pre></section> }
+@if (input is not null)
+{
+    <section class="border rounded p-3"><h2>@(id is null ? "新建模板" : "编辑模板")</h2>
+    <PromptForm Value="input" Busy="Busy" Save="Save" Cancel="() => input = null" /></section>
+}
+
+@code {
+    private List<PromptDto> prompts = [];
+    private PromptInput? input;
+    private PromptDto? viewed;
+    private Guid? id;
+    protected override Task OnInitializedAsync() => Run(Load);
+    private async Task Load() => prompts = await Api.Get<List<PromptDto>>("api/prompts");
+    private void New() { id = null; input = new(); viewed = null; }
+    private void View(PromptDto p) { viewed = p; input = null; }
+    private void Edit(PromptDto p) { id = p.Id; input = new() { Name = p.Name, Content = p.Content }; viewed = null; }
+    private Task Save() => Run(async () =>
+    {
+        await Api.Send(id is null ? HttpMethod.Post : HttpMethod.Put, id is null ? "api/prompts" : $"api/prompts/{id}", input);
+        input = null; await Load();
+    });
+    private Task Copy(PromptDto p) => Run(async () =>
+    {
+        await Api.Send(HttpMethod.Post, $"api/prompts/{p.Id}/copy", new { });
+        await Load();
+    });
+    private Task Delete(PromptDto p) => Run(async () =>
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"删除模板「{p.Name}」？历史任务及其提示词内容将保留。")) return;
+        await Api.Delete($"api/prompts/{p.Id}");
+        if (id == p.Id) input = null;
+        if (viewed?.Id == p.Id) viewed = null;
+        await Load();
+    });
+}

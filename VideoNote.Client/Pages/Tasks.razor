@@ -26,6 +26,13 @@
             @foreach (var model in models) { <option value="@model.Id">@model.ModelId</option> }
         </select>
     </div>
+    <div class="mb-3"><label for="task-prompt">提示词模板</label>
+        <select id="task-prompt" class="form-select" @bind="promptId"><option value="">不选择</option>
+            @foreach (var prompt in prompts) { <option value="@prompt.Id">@prompt.Name</option> }
+        </select>
+        @if (prompts.FirstOrDefault(p => p.Id.ToString() == promptId) is { } selectedPrompt)
+        { <pre class="text-wrap border p-2 mt-2">@selectedPrompt.Content</pre> }
+    </div>
     <button type="button" class="btn btn-primary" @onclick="Upload">上传并保存验证任务</button>
 </fieldset>
 @if (uploading)
@@ -48,6 +55,8 @@
 @code {
     private List<TaskDto> tasks = [];
     private List<ModelDto> models = [];
+    private List<PromptDto> prompts = [];
+    private string? promptId;
     private UploadLimitsDto? limits;
     private ElementReference fileInput;
     private IJSObjectReference? module;
@@ -62,6 +71,7 @@
     private async Task Load()
     {
         limits = await Api.Get<UploadLimitsDto>("api/tasks/upload-limits");
+        prompts = await Api.Get<List<PromptDto>>("api/prompts");
         models = await Api.Get<List<ModelDto>>("api/models");
         tasks = await Api.Get<List<TaskDto>>("api/tasks");
     }
@@ -77,7 +87,7 @@
             if (!limits.AllowedExtensions.Contains(Path.GetExtension(file.Name), StringComparer.OrdinalIgnoreCase)) { uploadError = "视频扩展名不受支持。"; return; }
             uploading = true; progress = 0;
             receiver ??= DotNetObjectReference.Create(this);
-            await module.InvokeAsync<TaskDto>("upload", fileInput, new { mode, modelConfigId = modelId }, receiver);
+            await module.InvokeAsync<TaskDto>("upload", fileInput, new { mode, modelConfigId = modelId, promptTemplateId = promptId }, receiver);
             await Run(Load);
             Notice = "视频已保存，当前尚未执行分析。";
         }

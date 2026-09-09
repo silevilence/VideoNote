@@ -1,0 +1,16 @@
+@using VideoNote.Shared.Contracts
+<EditForm Model="Value" OnValidSubmit="Save" FormName="prompt">
+    <DataAnnotationsValidator /><ValidationSummary />
+    <fieldset disabled="@Busy">
+        <div class="mb-3"><label for="prompt-name">模板名称</label><InputText id="prompt-name" class="form-control" @bind-Value="Value.Name" /></div>
+        <div class="mb-3"><label for="prompt-content">模板内容</label><InputTextArea id="prompt-content" rows="8" class="form-control" @bind-Value="Value.Content" /></div>
+        <button type="submit" class="btn btn-primary">保存模板</button>
+        <button type="button" class="btn btn-outline-secondary ms-2" @onclick="Cancel">取消</button>
+    </fieldset>
+</EditForm>
+@code {
+    [Parameter, EditorRequired] public PromptInput Value { get; set; } = new();
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback Save { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+}
