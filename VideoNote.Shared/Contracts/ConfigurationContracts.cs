@@ -26,6 +26,16 @@ public sealed class ProviderInput : IValidatableObject
             (ClearApiKey && (!string.IsNullOrEmpty(ApiKey) || !string.IsNullOrEmpty(ApiKeyEnvironmentVariable))))
             yield return new("输入密钥、环境变量和清除密钥只能选择一种。");
     }
+
+    /// <summary>编辑回填：密钥字段保持为空（留空保留语义），环境变量引用显式回显。</summary>
+    public static ProviderInput From(ProviderDto dto) => new()
+    {
+        Name = dto.Name,
+        Protocol = dto.Protocol,
+        BaseUrl = dto.BaseUrl,
+        ApiKeyEnvironmentVariable = dto.ApiKeyEnvironmentVariable,
+        TranscriptionModel = dto.TranscriptionModel
+    };
 }
 
 public sealed record ProviderDto(Guid Id, string Name, string Protocol, string BaseUrl,
@@ -42,6 +52,20 @@ public class ModelInput
     public bool SupportsImage { get; set; }
     public bool SupportsAudio { get; set; }
     public bool SupportsVideo { get; set; }
+
+    /// <summary>编辑回填：DTO → 输入，能力标记与上下文窗口原样保留。</summary>
+    public static ModelInput From(ModelDto dto) => new()
+    {
+        ProviderId = dto.ProviderId,
+        ModelId = dto.ModelId,
+        ContextWindow = dto.ContextWindow,
+        SupportsReasoning = dto.SupportsReasoning,
+        SupportsToolCalling = dto.SupportsToolCalling,
+        SupportsStreaming = dto.SupportsStreaming,
+        SupportsImage = dto.SupportsImage,
+        SupportsAudio = dto.SupportsAudio,
+        SupportsVideo = dto.SupportsVideo
+    };
 }
 public sealed class ModelDto : ModelInput
 {
