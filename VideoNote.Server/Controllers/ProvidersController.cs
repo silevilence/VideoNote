@@ -4,16 +4,18 @@ using VideoNote.Server.Configuration;
 using VideoNote.Server.Data;
 using VideoNote.Server.Data.Entities;
 using VideoNote.Shared.Contracts;
-using VideoNote.Shared.Domain;
 
 namespace VideoNote.Server.Controllers;
 
 [ApiController, Route("api/providers")]
 public sealed class ProvidersController(VideoNoteDbContext db, ProviderSecrets secrets) : ControllerBase
 {
-    private static ProviderDto Dto(Provider p) => new(p.Id, p.Name,
-        p.Protocol == ProviderProtocol.OpenAiCompatible ? "openai-compatible" : "gemini-native",
-        p.BaseUrl, p.ApiKey.Length > 0, ProviderSecrets.EnvironmentName(p.ApiKey), p.TranscriptionModel);
+    private static ProviderDto Dto(Provider p)
+    {
+        var secret = ProviderSecretReference.Parse(p.ApiKey);
+        return new(p.Id, p.Name, p.Protocol.ToWireName(), p.BaseUrl,
+            secret.IsConfigured, secret.EnvironmentVariableName, p.TranscriptionModel);
+    }
 
     [HttpGet]
     public async Task<IEnumerable<ProviderDto>> List(CancellationToken ct) =>
@@ -29,7 +31,8 @@ public sealed class ProvidersController(VideoNoteDbContext db, ProviderSecrets s
         var p = new Provider();
         Apply(p, input);
         db.Providers.Add(p);
-        if (!await Save(ct)) return Conflict(new { message = "提供商名称已存在。" });
+        if (await db.SaveConfigurationAsync(ct) is { } conflict)
+            return Conflict(new { message = conflict == ConfigurationConflict.Duplicate ? "提供商名称已存在。" : "关联配置已删除，请刷新后重试。" });
         return CreatedAtAction(nameof(Get), new { id = p.Id }, Dto(p));
     }
 
@@ -39,7 +42,8 @@ public sealed class ProvidersController(VideoNoteDbContext db, ProviderSecrets s
         var p = await db.Providers.FindAsync([id], ct);
         if (p is null) return NotFound();
         Apply(p, input);
-        if (!await Save(ct)) return Conflict(new { message = "提供商名称已存在。" });
+        if (await db.SaveConfigurationAsync(ct) is { } conflict)
+            return Conflict(new { message = conflict == ConfigurationConflict.Duplicate ? "提供商名称已存在。" : "关联配置已删除，请刷新后重试。" });
         return Ok(Dto(p));
     }
 
@@ -56,20 +60,14 @@ public sealed class ProvidersController(VideoNoteDbContext db, ProviderSecrets s
     private void Apply(Provider p, ProviderInput input)
     {
         p.Name = input.Name.Trim();
-        p.Protocol = input.Protocol == "openai-compatible" ? ProviderProtocol.OpenAiCompatible : ProviderProtocol.GeminiNative;
+        p.Protocol = ProviderProtocolNames.Parse(input.Protocol);
         p.BaseUrl = input.BaseUrl.TrimEnd('/');
         p.TranscriptionModel = string.IsNullOrWhiteSpace(input.TranscriptionModel) ? null : input.TranscriptionModel.Trim();
         p.UpdatedAtUtc = DateTime.UtcNow;
         if (input.ClearApiKey) p.ApiKey = "";
-        else if (!string.IsNullOrEmpty(input.ApiKeyEnvironmentVariable)) p.ApiKey = "env:" + input.ApiKeyEnvironmentVariable;
+        else if (!string.IsNullOrEmpty(input.ApiKeyEnvironmentVariable)) p.ApiKey = ProviderSecretReference.EnvironmentVariable(input.ApiKeyEnvironmentVariable).ToStorageValue();
         else if (!string.IsNullOrEmpty(input.ApiKey)) p.ApiKey = secrets.Protect(input.ApiKey);
     }
 
-    private async Task<bool> Save(CancellationToken ct)
-    {
-        try { await db.SaveChangesAsync(ct); return true; }
-        catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.Sqlite.SqliteException { SqliteExtendedErrorCode: 2067 })
-        { return false; }
-    }
 }
 

@@ -6,7 +6,7 @@ namespace VideoNote.Shared.Contracts;
 public sealed class ProviderInput : IValidatableObject
 {
     [Required, StringLength(200)] public string Name { get; set; } = "";
-    [Required] public string Protocol { get; set; } = "openai-compatible";
+    [Required] public string Protocol { get; set; } = ProviderProtocolNames.OpenAiCompatible;
     [Required, StringLength(2048)] public string BaseUrl { get; set; } = "";
     [StringLength(1024)] public string? ApiKey { get; set; }
     [RegularExpression(@"^[A-Za-z_][A-Za-z0-9_]*$"), StringLength(200)]
@@ -16,7 +16,7 @@ public sealed class ProviderInput : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (Protocol is not ("openai-compatible" or "gemini-native"))
+        if (!ProviderProtocolNames.TryParse(Protocol, out _))
             yield return new("协议无效。", [nameof(Protocol)]);
         if (!Uri.TryCreate(BaseUrl, UriKind.Absolute, out var uri) ||
             uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo) ||
@@ -41,7 +41,7 @@ public sealed class ProviderInput : IValidatableObject
 public sealed record ProviderDto(Guid Id, string Name, string Protocol, string BaseUrl,
     bool HasApiKey, string? ApiKeyEnvironmentVariable, string? TranscriptionModel);
 
-public class ModelInput
+public sealed class ModelInput
 {
     public Guid ProviderId { get; set; }
     [Required, StringLength(200)] public string ModelId { get; set; } = "";
@@ -67,8 +67,17 @@ public class ModelInput
         SupportsVideo = dto.SupportsVideo
     };
 }
-public sealed class ModelDto : ModelInput
+public sealed class ModelDto
 {
     public Guid Id { get; set; }
+    public Guid ProviderId { get; set; }
+    public string ModelId { get; set; } = "";
+    public int ContextWindow { get; set; }
+    public bool SupportsReasoning { get; set; }
+    public bool SupportsToolCalling { get; set; }
+    public bool SupportsStreaming { get; set; }
+    public bool SupportsImage { get; set; }
+    public bool SupportsAudio { get; set; }
+    public bool SupportsVideo { get; set; }
 }
 

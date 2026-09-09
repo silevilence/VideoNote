@@ -10,6 +10,33 @@ namespace VideoNote.Server.Tests.Api;
 
 public sealed class PromptTests
 {
+    [Theory]
+    [InlineData(10, false)]
+    [InlineData(200, false)]
+    [InlineData(196, true)]
+    public async Task Copies_keep_valid_names_and_duplicate_template_names_remain_allowed(int length, bool emoji)
+    {
+        await using var app = new ApiFactory();
+        using var client = app.CreateClient();
+        var input = new PromptInput { Name = new string('字', length) + (emoji ? "😀结尾" : ""), Content = "Copy me" };
+        var response = await client.PostAsJsonAsync("/api/prompts", input);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/prompts", input)).StatusCode);
+        var source = (await response.Content.ReadFromJsonAsync<PromptDto>())!;
+        var copyResponse = await client.PostAsJsonAsync($"/api/prompts/{source.Id}/copy", new { });
+        Assert.Equal(HttpStatusCode.Created, copyResponse.StatusCode);
+        var copy = (await copyResponse.Content.ReadFromJsonAsync<PromptDto>())!;
+        Assert.NotEqual(source.Id, copy.Id);
+        Assert.False(copy.IsBuiltIn);
+        Assert.Equal(source.Content, copy.Content);
+        Assert.EndsWith(" 副本", copy.Name);
+        Assert.True(copy.Name.Length <= VideoNote.Shared.Domain.PromptTemplateRules.MaxNameLength);
+        var expectedPrefix = source.Name[..Math.Min(source.Name.Length, emoji ? 196 : 197)];
+        Assert.Equal(expectedPrefix + " 副本", copy.Name);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/prompts/{copy.Id}",
+            new PromptInput { Name = copy.Name, Content = "Editable copy" })).StatusCode);
+    }
+
     [Fact]
     public async Task Builtins_are_readonly_custom_templates_are_editable_and_tasks_keep_snapshot()
     {

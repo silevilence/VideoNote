@@ -218,8 +218,8 @@ else
     });
     private static string ProtocolName(string protocol) => protocol switch
     {
-        "openai-compatible" => "OpenAI 兼容",
-        "gemini-native" => "Gemini 原生",
+        ProviderProtocolNames.OpenAiCompatible => "OpenAI 兼容",
+        ProviderProtocolNames.GeminiNative => "Gemini 原生",
         _ => protocol
     };
     private static string[] Caps(ModelDto m)

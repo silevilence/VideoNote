@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VideoNote.Server.Data.Entities;
+using VideoNote.Shared.Domain;
 
 namespace VideoNote.Server.Data;
 
@@ -44,7 +45,7 @@ public sealed class VideoNoteDbContext(DbContextOptions<VideoNoteDbContext> opti
         var promptTemplate = modelBuilder.Entity<PromptTemplate>();
         promptTemplate.ToTable("PromptTemplates");
         promptTemplate.HasKey(item => item.Id);
-        promptTemplate.Property(item => item.Name).HasMaxLength(200).IsRequired();
+        promptTemplate.Property(item => item.Name).HasMaxLength(PromptTemplateRules.MaxNameLength).IsRequired();
         promptTemplate.Property(item => item.Content).IsRequired();
         promptTemplate.HasData(BuiltInPrompts.Create());
 

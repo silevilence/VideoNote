@@ -37,7 +37,7 @@ public sealed class ChatClientFactory(VideoNoteDbContext db, ProviderSecrets sec
                 httpOptions: GeminiOptions(endpoint)).AsIChatClient(model.ModelId),
             _ => throw new InvalidOperationException("不支持该提供商协议。")
         };
-        return new VideoInputGuard(client);
+        return new VideoInputGuard(client, model.Provider.Protocol);
     }
 
     private static HttpOptions GeminiOptions(Uri endpoint)
@@ -55,14 +55,16 @@ public sealed class ChatClientFactory(VideoNoteDbContext db, ProviderSecrets sec
             : new HttpOptions { BaseUrl = endpoint.ToString().TrimEnd('/'), ApiVersion = "v1beta", Timeout = 120000 };
     }
 
-    private sealed class VideoInputGuard(IChatClient inner) : DelegatingChatClient(inner)
+    private sealed class VideoInputGuard(IChatClient inner, ProviderProtocol protocol) : DelegatingChatClient(inner)
     {
-        private static ChatMessage[] Validate(IEnumerable<ChatMessage> messages)
+        private ChatMessage[] Validate(IEnumerable<ChatMessage> messages)
         {
             var snapshot = messages.ToArray();
             if (snapshot.SelectMany(m => m.Contents).OfType<DataContent>()
                 .Any(c => c.MediaType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)))
-                throw new NotSupportedException("视频必须先通过 Gemini File API 上传，再传入文件引用；不支持内联视频。");
+                throw new NotSupportedException(protocol == ProviderProtocol.GeminiNative
+                    ? "视频必须先通过 Gemini File API 上传，再传入文件引用；不支持内联视频。"
+                    : "OpenAI 兼容适配器不支持内联视频，请改用抽帧或字幕理解模式。");
             return snapshot;
         }
         public override Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages,

@@ -41,7 +41,7 @@ public sealed class PromptsController(VideoNoteDbContext db) : ControllerBase
     {
         var source = await db.PromptTemplates.FindAsync([id], ct);
         if (source is null) return NotFound();
-        var copy = new PromptTemplate { Name = source.Name[..Math.Min(source.Name.Length, 195)] + " 副本", Content = source.Content };
+        var copy = source.CreateCopy();
         db.PromptTemplates.Add(copy); await db.SaveChangesAsync(ct);
         return CreatedAtAction(nameof(Get), new { id = copy.Id }, Dto(copy));
     }

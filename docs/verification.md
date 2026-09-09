@@ -1,5 +1,18 @@
 # 本轮验证记录
 
+## 2026-09-09 后端审核修复
+
+- 按用户提供的 9 条审核意见逐条核实：7 条完全采纳、1 条部分采纳、1 条不采纳。正式界面的结构和样式保留，客户端仅改为引用共享协议常量。
+- Standards 1/2/3/5：密钥前缀统一由 ProviderSecretReference 解析；协议枚举与 API 字符串集中映射；配置保存仅将 SQLite 唯一键 2067、外键 787 转换为明确冲突，CHECK/NOT NULL 等其他错误继续抛出；ModelDto 独立于带校验注解的 ModelInput，编辑回填仍通过 From 映射。
+- Standards 4 不采纳删除：ROADMAP 已完成的骨架要求服务端承载 SignalR，空 Hub 可作为服务端推送的连接入口，无客户端调用方法不等于不可用。本轮独立 Production 实例的 /hubs/analysis/negotiate 返回 200，支持 WebSockets/SSE/LongPolling；分析进度事件仍属于计划中任务。
+- Standards 6 部分采纳：统一模板名称上限与复制命名，按后缀实际长度截断并保留完整 Unicode 代理对，实体封装复制。保留 IsBuiltIn 只读判断、允许同名模板的直接保存及历史迁移快照；模板名称没有唯一约束，不应套用提供商的重复名称错误处理，历史迁移也不应依赖可变运行时代码。
+- Spec 1/2/3：内联视频错误按协议区分，流式/非流式均在发请求前拦截；上传恢复代码默认值、配置数组替换而非追加；新增一次性 DeepSeek 配置迁移，已有同名或同地址配置保持原状，编辑/删除后重启不覆盖或复建。
+- DeepSeek 密钥只保存 env:DEEPSEEK_API_KEY，由程序在模型调用时解析。本轮不读取真实密钥，也未重复真实模型调用；AI 回归采用两个协议的本地模拟端点。
+- 验证：58 项测试全部通过（原 39 项，新增 19 项），0 失败/跳过。Server/Shared 行覆盖率 98.18%（812/827），分支覆盖率 85.67%；沿用 tests/coverage.runsettings，排除迁移与服务端模板组件，客户端另做浏览器验证。
+- Release 发布成功；独立 Production 实例通过 settings.cjs、prompts.cjs、upload.cjs，包含 DeepSeek 预置展示、两种协议切换、全部模型能力与上下文回填，以及 320 MiB 上传，无 pageerror。EF 检查无待生成迁移，C# 格式检查通过。
+- 复现：dotnet test tests/VideoNote.Server.Tests --collect "XPlat Code Coverage" --settings tests/coverage.runsettings；dotnet publish VideoNote.Server -c Release。浏览器脚本使用 VIDEONOTE_TEST_URL 指向独立测试实例，默认 http://localhost:5189；模型设置测试要求包含新迁移预置的 DeepSeek 配置。
+- 上传默认上限 1 GiB；缺少 Upload 或 AllowedExtensions 时使用代码中的 .mp4/.mkv/.mov/.webm/.avi/.m4v。需要覆盖时，在 appsettings 配置 Upload:AllowedExtensions 数组，例如 [".mp4"]；显式空数组或非法扩展名仍视为无效配置。默认 appsettings 不再重复列举数组，避免后续配置覆盖残留默认索引。
+
 ## 2026-09-09 前端界面改版
 
 - 设计系统：`VideoNote.Server/wwwroot/app.css` 重写为暗色放映室主题（自建设计令牌与组件样式），`App.razor` 移除 Bootstrap CSS 引用，改为 Sora / IBM Plex Mono 网络字体（离线回退系统中文字体）。布局壳与导航移入 `MainLayout.razor` / `NavMenu.razor`，删除原隔离样式文件。
@@ -57,8 +70,8 @@
 
 ## 使用本轮功能
 1. 在仓库根目录运行 dotnet run --project VideoNote.Server --launch-profile http，然后打开启动日志中的本地地址。
-2. 模型设置 → 新建提供商：名称 DeepSeek，协议 OpenAI 兼容，Base URL 为 https://api.deepseek.com，密钥环境变量名称为 DEEPSEEK_API_KEY；API Key 输入留空。
-3. 在该提供商下新建模型：Model ID 为 deepseek-v4-flash-vision-exp，勾选图片和流式。上下文窗口按实际模型规格填写，表单默认值不是对模型规格的声明。
+2. 首次启动或升级后，模型设置页会预置 DeepSeek（OpenAI 兼容、https://api.deepseek.com、环境变量 DEEPSEEK_API_KEY）；无需手动通过 CRUD 创建。已有同名或同地址提供商保持原配置。
+3. 预置模型为 deepseek-v4-flash-vision-exp，启用图片和流式，可在现有设置页编辑或删除；重启不会复建已删除项。上下文窗口初值 128000 沿用表单默认值，使用前按实际模型规格修改，不代表已确认的模型规格。
 4. 在提示词模板页复制内置模板或创建自定义模板；上传验证页可选择模型、模式和模板，保存视频并验证持久化及删除。
 5. 服务进程需要继承所配置的环境变量。更改 Windows 环境变量后，重新启动服务进程。程序不在 API 列表/详情中返回密钥。
 6. 数据库和媒体在服务端 work 目录；使用直接输入的密钥时，还需要保留 work/keys 才能解密已有配置。该目录应作为本地应用数据管理，不纳入 Git。

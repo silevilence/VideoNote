@@ -40,7 +40,8 @@ public sealed class ModelsController(VideoNoteDbContext db) : ControllerBase
         var m = new ModelConfig();
         Apply(m, input);
         db.ModelConfigs.Add(m);
-        if (!await Save(ct)) return Conflict(new { message = "该提供商下已存在同名模型，或提供商已删除。" });
+        if (await db.SaveConfigurationAsync(ct) is { } conflict)
+            return Conflict(new { message = conflict == ConfigurationConflict.Duplicate ? "该提供商下已存在同名模型。" : "提供商已删除，请刷新后重试。" });
         return CreatedAtAction(nameof(Get), new { id = m.Id }, Dto(m));
     }
 
@@ -52,7 +53,8 @@ public sealed class ModelsController(VideoNoteDbContext db) : ControllerBase
         if (!await db.Providers.AnyAsync(p => p.Id == input.ProviderId, ct))
             return BadRequest(new { message = "提供商不存在。" });
         Apply(m, input);
-        if (!await Save(ct)) return Conflict(new { message = "该提供商下已存在同名模型，或提供商已删除。" });
+        if (await db.SaveConfigurationAsync(ct) is { } conflict)
+            return Conflict(new { message = conflict == ConfigurationConflict.Duplicate ? "该提供商下已存在同名模型。" : "提供商已删除，请刷新后重试。" });
         return Ok(Dto(m));
     }
 
@@ -72,12 +74,6 @@ public sealed class ModelsController(VideoNoteDbContext db) : ControllerBase
         m.SupportsReasoning = i.SupportsReasoning; m.SupportsToolCalling = i.SupportsToolCalling;
         m.SupportsStreaming = i.SupportsStreaming; m.SupportsImage = i.SupportsImage;
         m.SupportsAudio = i.SupportsAudio; m.SupportsVideo = i.SupportsVideo;
-    }
-    private async Task<bool> Save(CancellationToken ct)
-    {
-        try { await db.SaveChangesAsync(ct); return true; }
-        catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 19 })
-        { return false; }
     }
 }
 

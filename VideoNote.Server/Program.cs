@@ -17,7 +17,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddControllers();
 builder.Services.AddSingleton<VideoNote.Server.Configuration.ProviderSecrets>();
 builder.Services.AddSignalR();
-builder.Services.AddOptions<UploadOptions>().BindConfiguration("Upload")
+builder.Services.AddOptions<UploadOptions>()
+    .Configure<IConfiguration>((options, config) => options.Bind(config.GetSection("Upload")))
     .Validate(o => o.MaxBytes > 0 && o.AllowedExtensions is { Length: > 0 } &&
         o.AllowedExtensions.All(e => !string.IsNullOrWhiteSpace(e) && e.StartsWith('.') && e.Length > 1 &&
             e.Skip(1).All(char.IsAsciiLetterOrDigit)), "上传大小或扩展名配置无效。").ValidateOnStart();

@@ -6,19 +6,19 @@ namespace VideoNote.Server.Configuration;
 public sealed class ProviderSecrets(IDataProtectionProvider protection)
 {
     private readonly IDataProtector protector = protection.CreateProtector("VideoNote.ProviderApiKey.v1");
-    public string Protect(string key) => "protected:" + protector.Protect(key);
-    public static string? EnvironmentName(string stored) =>
-        stored.StartsWith("env:", StringComparison.Ordinal) ? stored[4..] : null;
+    public string Protect(string key) => ProviderSecretReference.Protected(protector.Protect(key)).ToStorageValue();
 
     public string Resolve(string stored)
     {
-        if (EnvironmentName(stored) is { } name)
-            return Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
-                ? value : throw new InvalidOperationException("提供商密钥环境变量未设置。");
-        if (stored.StartsWith("protected:", StringComparison.Ordinal))
-            return protector.Unprotect(stored[10..]);
-        // Existing databases may contain plaintext from the initial schema.
-        return stored;
+        var reference = ProviderSecretReference.Parse(stored);
+        return reference.Kind switch
+        {
+            ProviderSecretKind.EnvironmentVariable =>
+                Environment.GetEnvironmentVariable(reference.Payload) is { Length: > 0 } value
+                    ? value : throw new InvalidOperationException("提供商密钥环境变量未设置。"),
+            ProviderSecretKind.Protected => protector.Unprotect(reference.Payload),
+            // Existing databases may contain plaintext from the initial schema.
+            _ => reference.Payload
+        };
     }
 }
-

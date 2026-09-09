@@ -67,8 +67,22 @@ public sealed class ChatClientFactoryTests
             Assert.Equal("OK", text.ToString());
             await client.GetResponseAsync([new ChatMessage(ChatRole.User,
                 [new TextContent("Describe"), new DataContent(new byte[] { 1, 2, 3 }, "image/png")])]);
-            await Assert.ThrowsAsync<NotSupportedException>(() => client.GetResponseAsync([new ChatMessage(ChatRole.User,
-                [new DataContent(new byte[] { 1 }, "video/mp4")])]));
+            ChatMessage[] video = [new ChatMessage(ChatRole.User, [new DataContent(new byte[] { 1 }, "video/mp4")])];
+            var beforeVideo = requests.Count;
+            var videoError = await Assert.ThrowsAsync<NotSupportedException>(() => client.GetResponseAsync(video));
+            var streamError = await Assert.ThrowsAsync<NotSupportedException>(async () =>
+            {
+                await foreach (var update in client.GetStreamingResponseAsync(video)) { }
+            });
+            Assert.Equal(videoError.Message, streamError.Message);
+            Assert.Equal(beforeVideo, requests.Count);
+            if (protocol == ProviderProtocol.GeminiNative)
+                Assert.Contains("Gemini File API", videoError.Message);
+            else
+            {
+                Assert.Contains("OpenAI", videoError.Message);
+                Assert.DoesNotContain("Gemini", videoError.Message);
+            }
             if (protocol == ProviderProtocol.GeminiNative)
             {
                 await client.GetResponseAsync([new ChatMessage(ChatRole.User,

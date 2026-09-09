@@ -12,8 +12,8 @@
             <div class="field">
                 <label for="provider-protocol">协议</label>
                 <InputSelect id="provider-protocol" class="form-select" @bind-Value="Value.Protocol">
-                    <option value="openai-compatible">OpenAI 兼容</option>
-                    <option value="gemini-native">Gemini 原生</option>
+                    <option value="@ProviderProtocolNames.OpenAiCompatible">OpenAI 兼容</option>
+                    <option value="@ProviderProtocolNames.GeminiNative">Gemini 原生</option>
                 </InputSelect>
             </div>
         </div>
