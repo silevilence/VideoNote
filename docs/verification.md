@@ -1,5 +1,13 @@
 # 本轮验证记录
 
+## 2026-09-09 前端界面改版
+
+- 设计系统：`VideoNote.Server/wwwroot/app.css` 重写为暗色放映室主题（自建设计令牌与组件样式），`App.razor` 移除 Bootstrap CSS 引用，改为 Sora / IBM Plex Mono 网络字体（离线回退系统中文字体）。布局壳与导航移入 `MainLayout.razor` / `NavMenu.razor`，删除原隔离样式文件。
+- 页面结构：首页改总览仪表盘（统计 + 最近任务 + 配置就绪度）；任务拆为 `/tasks/new`（拖拽上传、模式卡片、按模式能力过滤模型、可勾选显示全部手动覆盖）、`/tasks`（状态筛选、时间码、删除）与 `/tasks/{id}` 详情页（任务信息、阶段、提示词快照、报告区明确标注管线未接入）；设置页与提示词页改卡片式管理，表单组件统一新样式。上传成功后跳转详情页。删除 `Counter.razor`、`Weather.razor`。
+- 顺带修复：`UploadOptions.AllowedExtensions` 预置默认值导致配置绑定追加、`/api/tasks/upload-limits` 返回双份扩展名（选项默认改为空数组，由 appsettings 提供；两处直接构造 `UploadOptions` 的测试改为显式传扩展名）。
+- 验证：`dotnet test -c Release` 39/39 通过；`dotnet publish -c Release` 后 Production 独立实例（`Storage__RootPath` 指向发布目录内隔离目录）依次通过 `tests/browser/settings.cjs`、`prompts.cjs`、`upload.cjs`（含 320 MiB 原生上传），无 pageerror；Playwright 全页截图复核桌面与移动端布局。
+- 复现：与既有浏览器流程相同，先 `npm install --prefix work-tests/browser playwright`，从发布目录启动服务到 localhost:5189 后依次 `node tests/browser/*.cjs`。截图存于 `work-tests/browser/shots/`。
+
 ## 逐项快速审核
 - 配置 API：HTTP CRUD、能力字段存取、密钥不回显、加密保存、环境变量引用、级联删除与历史保留通过。
 - 设置 UI：Edge 无头浏览器完成两级新增/编辑/刷新/删除，无 pageerror；零警告构建。
