@@ -20,3 +20,8 @@
 - https://www.nuget.org/packages/Microsoft.Extensions.AI.OpenAI/10.9.0
 - https://googleapis.github.io/dotnet-genai/api/Microsoft.Extensions.AI.GoogleGenAIExtensions.html
 - https://googleapis.github.io/dotnet-genai/api/Google.GenAI.Types.HttpOptions.html
+
+## FFmpeg 验证
+- 仓库样例 tests/fixtures/sample.mkv：125 秒、160×90、5 fps，含音轨和两条软字幕，约 1.5 MB；可运行 tests/fixtures/generate.ps1 重建。
+- 真实 FFmpeg 测试通过：3 段，起点 0/55/110 秒；段时长误差 ≤0.3 秒；约 125 帧及毫秒时间戳；16 kHz 单声道 WAV 和 MP3；两条 SRT 内容、无字幕分支和取消/缺失程序提示。
+- Ffmpeg 配置见 appsettings.json：分段时长必须大于重叠，帧率 (0,60]，超时单位秒。文件参数通过 ArgumentList 传递，不执行 shell 拼接。

@@ -17,6 +17,16 @@ builder.Services.AddRazorComponents()
 builder.Services.AddControllers();
 builder.Services.AddSingleton<VideoNote.Server.Configuration.ProviderSecrets>();
 builder.Services.AddSignalR();
+builder.Services.AddOptions<VideoNote.Server.Media.FfmpegOptions>()
+    .BindConfiguration("Ffmpeg")
+    .Validate(o => double.IsFinite(o.SegmentSeconds) && o.SegmentSeconds > 0 &&
+        double.IsFinite(o.OverlapSeconds) && o.OverlapSeconds >= 0 && o.OverlapSeconds < o.SegmentSeconds &&
+        double.IsFinite(o.FramesPerSecond) && o.FramesPerSecond > 0 && o.FramesPerSecond <= 60 &&
+        o.TimeoutSeconds > 0 && !string.IsNullOrWhiteSpace(o.FfmpegPath) && !string.IsNullOrWhiteSpace(o.FfprobePath),
+        "FFmpeg 分段、重叠、帧率、超时和程序路径配置无效。")
+    .ValidateOnStart();
+builder.Services.AddSingleton<VideoNote.Server.Media.MediaProcessRunner>();
+builder.Services.AddSingleton<VideoNote.Server.Media.IFfmpegService, VideoNote.Server.Media.FfmpegService>();
 builder.Services.AddScoped<VideoNote.Server.AI.IModelChatClientFactory, VideoNote.Server.AI.ChatClientFactory>();
 
 builder.Services.AddSingleton(sp =>
