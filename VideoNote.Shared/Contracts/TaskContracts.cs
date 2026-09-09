@@ -1,0 +1,15 @@
+using System.ComponentModel.DataAnnotations;
+using VideoNote.Shared.Domain;
+
+namespace VideoNote.Shared.Contracts;
+
+public sealed class CreateTaskInput
+{
+    [Required, StringLength(260)] public string FileName { get; set; } = "";
+    [EnumDataType(typeof(AnalysisMode))] public AnalysisMode Mode { get; set; }
+    public Guid? ModelConfigId { get; set; }
+    public Guid? PromptTemplateId { get; set; }
+}
+public sealed record TaskDto(Guid Id, string OriginalFileName, AnalysisMode Mode, AnalysisTaskStatus Status,
+    string? StageDescription, DateTime CreatedAtUtc, Guid? ModelConfigId, Guid? PromptTemplateId);
+public sealed record UploadLimitsDto(long MaxBytes, string[] AllowedExtensions);

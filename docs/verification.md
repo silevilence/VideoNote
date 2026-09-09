@@ -25,3 +25,10 @@
 - 仓库样例 tests/fixtures/sample.mkv：125 秒、160×90、5 fps，含音轨和两条软字幕，约 1.5 MB；可运行 tests/fixtures/generate.ps1 重建。
 - 真实 FFmpeg 测试通过：3 段，起点 0/55/110 秒；段时长误差 ≤0.3 秒；约 125 帧及毫秒时间戳；16 kHz 单声道 WAV 和 MP3；两条 SRT 内容、无字幕分支和取消/缺失程序提示。
 - Ffmpeg 配置见 appsettings.json：分段时长必须大于重叠，帧率 (0,60]，超时单位秒。文件参数通过 ArgumentList 传递，不执行 shell 拼接。
+
+## 上传与存储验证
+- 20 个测试通过；320 MiB 有效 MP4 原生浏览器上传成功，服务端集成测试验证 SHA-256 完全一致。
+- 文件通过 XMLHttpRequest.send(File) 从浏览器直接上传，不经 WASM 字节数组；服务端使用 64 KiB 缓冲、逐块计数和临时文件，大小默认 1 GiB。
+- 非法扩展名、路径穿越文件名、空文件、已知/未知长度超限、中断与取消均无残留任务/临时文件。
+- 删除任务清理四类工作目录及对话记录；拒绝删除运行中任务、符号链接和目录联接。文件占用导致清理失败时保留任务记录以便重试。
+- 浏览器真实上传脚本：先运行 tests/fixtures/generate-large.ps1，再 node tests/browser/upload.cjs；大样例位于忽略的 work-tests。

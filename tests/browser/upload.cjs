@@ -1,0 +1,25 @@
+const { chromium } = require('../../work-tests/browser/node_modules/playwright');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+(async () => {
+ const browser = await chromium.launch({channel:'msedge',headless:true});
+ const page = await browser.newPage();
+ page.on('dialog', d => d.accept());
+ const errors=[]; page.on('pageerror', e=>errors.push(e.message));
+ await page.goto((process.env.VIDEONOTE_TEST_URL || 'http://localhost:5189') + '/tasks');
+ await page.getByRole('button',{name:'上传并保存验证任务'}).waitFor();
+ await page.getByLabel('视频文件',{exact:true}).setInputFiles(path.resolve('tests/fixtures/subtitles.srt'));
+ await page.getByRole('button',{name:'上传并保存验证任务'}).click();
+ await page.getByText('视频扩展名不受支持。',{exact:true}).waitFor();
+ await page.getByLabel('视频文件',{exact:true}).setInputFiles(path.resolve('work-tests/large.mp4'));
+ await page.getByRole('button',{name:'上传并保存验证任务'}).click();
+ await page.getByRole('cell',{name:'large.mp4',exact:true}).waitFor({timeout:120000});
+ await page.reload();
+ await page.getByRole('cell',{name:'large.mp4',exact:true}).waitFor();
+ await page.screenshot({path:'work-tests/browser/upload.png',fullPage:true});
+ await page.getByRole('row').filter({hasText:'large.mp4'}).getByRole('button',{name:'删除任务及物料'}).click();
+ await page.getByText('暂无任务。',{exact:true}).waitFor();
+ assert.deepEqual(errors,[]);
+ console.log('PASS: native browser 320 MiB upload, extension validation, persistence and deletion');
+ await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

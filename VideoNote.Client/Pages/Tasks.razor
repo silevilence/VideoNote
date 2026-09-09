@@ -1,0 +1,112 @@
+@page "/tasks"
+@inherits OperationPage
+@implements IAsyncDisposable
+@inject ApiClient Api
+@inject IJSRuntime JS
+@using VideoNote.Shared.Contracts
+@using VideoNote.Shared.Domain
+@using VideoNote.Client.Components
+@using VideoNote.Client.Services
+
+<PageTitle>视频上传验证 · VideoNote</PageTitle>
+<h1>视频上传验证</h1>
+<p class="alert alert-info">此页验证上传、配置选择、持久化和删除清理。保存后尚不会执行分析。</p>
+@if (Error is not null) { <div class="alert alert-danger" role="alert">@Error</div> }
+@if (uploadError is not null) { <div class="alert alert-danger" role="alert">@uploadError</div> }
+@if (Notice is not null) { <p role="status">@Notice</p> }
+<fieldset disabled="@(Busy || uploading || limits is null)" class="border rounded p-3 mb-4">
+    <legend class="fs-5">保存一个验证任务</legend>
+    <div class="mb-3"><label for="video-file">视频文件</label><input id="video-file" type="file" class="form-control" accept="@string.Join(",", limits?.AllowedExtensions ?? [])" @ref="fileInput" /></div>
+    @if (limits is not null) { <p>上限 @(limits.MaxBytes / 1024 / 1024) MiB；支持 @string.Join("、", limits.AllowedExtensions)</p> }
+    <div class="mb-3"><label for="task-mode">理解模式</label>
+        <select id="task-mode" class="form-select" @bind="mode"><option value="DirectVideo">直接理解</option><option value="SampledFrames">抽帧理解</option><option value="Subtitles">字幕理解</option></select>
+    </div>
+    <div class="mb-3"><label for="task-model">模型（验证上传时可留空）</label>
+        <select id="task-model" class="form-select" @bind="modelId"><option value="">不选择</option>
+            @foreach (var model in models) { <option value="@model.Id">@model.ModelId</option> }
+        </select>
+    </div>
+    <button type="button" class="btn btn-primary" @onclick="Upload">上传并保存验证任务</button>
+</fieldset>
+@if (uploading)
+{
+    <p role="status">@(progress < 100 ? $"上传中 {progress}%" : "上传完成，服务端正在保存…")</p>
+    <progress class="w-100" max="100" value="@progress">@progress%</progress>
+    <button class="btn btn-outline-danger mb-3" @onclick="CancelUpload">取消上传</button>
+}
+<h2>已保存任务</h2>
+<button class="btn btn-outline-secondary mb-3" disabled="@(Busy || uploading)" @onclick="() => Run(Load)">刷新列表</button>
+@if (Busy) { <p role="status">正在加载…</p> }
+@if (tasks.Count == 0 && !Busy) { <p>暂无任务。</p> }
+<div class="table-responsive"><table class="table"><thead><tr><th>文件</th><th>模式</th><th>说明</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
+@foreach (var task in tasks)
+{
+    <tr @key="task.Id"><td>@task.OriginalFileName</td><td>@ModeName(task.Mode)</td><td>@task.StageDescription</td><td>@task.CreatedAtUtc.ToLocalTime().ToString("g")</td><td><button class="btn btn-sm btn-outline-danger" disabled="@(Busy || uploading)" @onclick="() => Delete(task)">删除任务及物料</button></td></tr>
+}
+</tbody></table></div>
+
+@code {
+    private List<TaskDto> tasks = [];
+    private List<ModelDto> models = [];
+    private UploadLimitsDto? limits;
+    private ElementReference fileInput;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<Tasks>? receiver;
+    private string mode = "SampledFrames";
+    private string? modelId;
+    private string? uploadError;
+    private bool uploading;
+    private bool disposed;
+    private int progress;
+    protected override Task OnInitializedAsync() => Run(Load);
+    private async Task Load()
+    {
+        limits = await Api.Get<UploadLimitsDto>("api/tasks/upload-limits");
+        models = await Api.Get<List<ModelDto>>("api/models");
+        tasks = await Api.Get<List<TaskDto>>("api/tasks");
+    }
+    private async Task Upload()
+    {
+        uploadError = null;
+        try
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./upload.js");
+            var file = await module.InvokeAsync<SelectedFile?>("selectedFile", fileInput);
+            if (file is null) { uploadError = "请先选择视频。"; return; }
+            if (file.Size == 0 || file.Size > limits!.MaxBytes) { uploadError = "文件为空或超过上传大小上限。"; return; }
+            if (!limits.AllowedExtensions.Contains(Path.GetExtension(file.Name), StringComparer.OrdinalIgnoreCase)) { uploadError = "视频扩展名不受支持。"; return; }
+            uploading = true; progress = 0;
+            receiver ??= DotNetObjectReference.Create(this);
+            await module.InvokeAsync<TaskDto>("upload", fileInput, new { mode, modelConfigId = modelId }, receiver);
+            await Run(Load);
+            Notice = "视频已保存，当前尚未执行分析。";
+        }
+        catch (JSException ex) { uploadError = ex.Message.Split('\n')[0]; }
+        finally { uploading = false; }
+    }
+    [JSInvokable]
+    public Task UploadProgress(int value)
+    {
+        if (disposed) return Task.CompletedTask;
+        progress = value;
+        return InvokeAsync(StateHasChanged);
+    }
+    private async Task CancelUpload() { if (module is not null) await module.InvokeVoidAsync("cancel", fileInput); }
+    private Task Delete(TaskDto task) => Run(async () =>
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"删除「{task.OriginalFileName}」及视频、帧、音频、字幕和对话记录？")) return;
+        await Api.Delete($"api/tasks/{task.Id}"); await Load();
+    });
+    private static string ModeName(AnalysisMode value) => value switch { AnalysisMode.DirectVideo => "直接理解", AnalysisMode.SampledFrames => "抽帧理解", _ => "字幕理解" };
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (module is not null)
+        {
+            try { await CancelUpload(); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+        receiver?.Dispose();
+    }
+    private sealed record SelectedFile(string Name, long Size);
+}
