@@ -40,6 +40,7 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 - Windows 11；.NET SDK 10.0.301（另有 6.0/8.0/9.0）
 - FFmpeg 7.1.1（gyan.dev full build）已在 PATH
 - Docker 不可用，按本机 Windows 运行设计（ASP.NET Core 跨平台，迁移时仅需调整 FFmpeg 路径配置）
+- VS Code 从仓库根目录按 F5：先构建 Server 项目，再使用现有 `http` 启动配置运行并打开浏览器；工作目录为 `VideoNote.Server`。
 
 ## 开发约定
 
