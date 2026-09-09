@@ -14,6 +14,7 @@ public sealed class ConfigurationApiTests
     {
         await using var app = new ApiFactory();
         using var client = app.CreateClient();
+        Assert.Contains("work-tests", app.Services.GetRequiredService<VideoNote.Server.Storage.WorkDirectoryPaths>().Root);
         var input = new ProviderInput { Name = "Test", BaseUrl = "https://example.com/v1", ApiKey = "test-only-secret" };
         var response = await client.PostAsJsonAsync("/api/providers", input);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -68,6 +69,7 @@ public sealed class ConfigurationApiTests
     {
         await using var app = new ApiFactory();
         using var client = app.CreateClient();
+        Assert.Contains("work-tests", app.Services.GetRequiredService<VideoNote.Server.Storage.WorkDirectoryPaths>().Root);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/providers",
             new ProviderInput { Name = " ", BaseUrl = "file:///test", Protocol = "unknown" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/models",
@@ -75,4 +77,3 @@ public sealed class ConfigurationApiTests
         Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/api/models/{Guid.NewGuid()}")).StatusCode);
     }
 }
-

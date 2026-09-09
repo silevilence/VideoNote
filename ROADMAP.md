@@ -78,10 +78,10 @@
     - [x] 提供商下模型列表与新建/编辑/删除表单（含能力标记勾选、上下文窗口输入）
     - 验收：界面完成两级增删改查，刷新后数据保留，删除提供商时其模型级联处理行为明确
 
-- [ ] **AI 客户端工厂**（Microsoft.Extensions.AI 统一模型交互）
-    - [ ] 基于 IChatClient 抽象：OpenAI 兼容适配器与 Gemini 原生适配器
-    - [ ] 按数据库配置动态构建客户端（协议/地址/密钥/模型名）
-    - [ ] 流式响应（GetStreamingResponseAsync）与多模态输入能力透出
+- [x] **AI 客户端工厂**（Microsoft.Extensions.AI 统一模型交互）
+    - [x] 基于 IChatClient 抽象：OpenAI 兼容适配器与 Gemini 原生适配器
+    - [x] 按数据库配置动态构建客户端（协议/地址/密钥/模型名）
+    - [x] 流式响应（GetStreamingResponseAsync）与多模态输入能力透出
     - 验收：同一调用方代码可分别调通 OpenAI 兼容端点与 Gemini 端点，文本（流式与非流式）请求返回正确结果
 
 - [ ] **FFmpeg 服务封装**（视频物料处理能力）

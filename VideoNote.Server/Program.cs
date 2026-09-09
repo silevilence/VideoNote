@@ -17,32 +17,30 @@ builder.Services.AddRazorComponents()
 builder.Services.AddControllers();
 builder.Services.AddSingleton<VideoNote.Server.Configuration.ProviderSecrets>();
 builder.Services.AddSignalR();
+builder.Services.AddScoped<VideoNote.Server.AI.IModelChatClientFactory, VideoNote.Server.AI.ChatClientFactory>();
 
-var storageOptions = builder.Configuration
-    .GetSection(WorkDirectoryOptions.SectionName)
-    .Get<WorkDirectoryOptions>() ?? new WorkDirectoryOptions();
-var workDirectoryPaths = WorkDirectoryPaths.Create(
-    builder.Environment.ContentRootPath,
-    storageOptions);
-Directory.CreateDirectory(workDirectoryPaths.Root);
-builder.Services.AddSingleton(workDirectoryPaths);
-builder.Services.AddSingleton<WorkDirectoryInitializer>();
-builder.Services.AddDataProtection()
-    .SetApplicationName("VideoNote")
-    .PersistKeysToFileSystem(new DirectoryInfo(workDirectoryPaths.Keys));
-
-var sqliteConnectionString = new SqliteConnectionStringBuilder(
-    builder.Configuration.GetConnectionString("VideoNote") ?? "Data Source=videonote.db");
-if (!Path.IsPathRooted(sqliteConnectionString.DataSource))
+builder.Services.AddSingleton(sp =>
 {
-    sqliteConnectionString.DataSource = Path.Combine(
-        workDirectoryPaths.Root,
-        sqliteConnectionString.DataSource);
-}
-
-builder.Services.AddDbContext<VideoNoteDbContext>(options =>
-    options.UseSqlite(sqliteConnectionString.ToString()));
-
+    var config = sp.GetRequiredService<IConfiguration>();
+    var options = config.GetSection(WorkDirectoryOptions.SectionName).Get<WorkDirectoryOptions>() ?? new();
+    return WorkDirectoryPaths.Create(sp.GetRequiredService<IWebHostEnvironment>().ContentRootPath, options);
+});
+builder.Services.AddSingleton<WorkDirectoryInitializer>();
+builder.Services.AddDataProtection().SetApplicationName("VideoNote");
+builder.Services.AddOptions<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>()
+    .Configure<WorkDirectoryPaths>((options, paths) =>
+        options.XmlRepository = new Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository(
+            new DirectoryInfo(paths.Keys), Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance));
+builder.Services.AddDbContext<VideoNoteDbContext>((sp, options) =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var paths = sp.GetRequiredService<WorkDirectoryPaths>();
+    var connection = new SqliteConnectionStringBuilder(
+        config.GetConnectionString("VideoNote") ?? "Data Source=videonote.db");
+    if (!Path.IsPathRooted(connection.DataSource))
+        connection.DataSource = Path.Combine(paths.Root, connection.DataSource);
+    options.UseSqlite(connection.ToString());
+});
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
