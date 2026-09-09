@@ -1,0 +1,129 @@
+@page "/settings"
+@inherits OperationPage
+@inject ApiClient Api
+@inject IJSRuntime JS
+@using VideoNote.Shared.Contracts
+@using VideoNote.Client.Components
+@using VideoNote.Client.Services
+
+<PageTitle>模型设置 · VideoNote</PageTitle>
+<h1>模型设置</h1>
+<p>管理提供商连接及其模型能力。删除配置后，历史任务保留。</p>
+@if (Error is not null) { <div class="alert alert-danger" role="alert">@Error</div> }
+@if (Busy) { <p role="status">正在处理…</p> }
+<button class="btn btn-primary mb-3" disabled="@Busy" @onclick="NewProvider">新建提供商</button>
+<button class="btn btn-outline-secondary mb-3 ms-2" disabled="@Busy" @onclick="() => Run(Load)">刷新</button>
+@if (providers.Count == 0 && !Busy) { <p>暂无提供商，请先添加。</p> }
+<div class="table-responsive">
+<table class="table">
+    <thead><tr><th>名称</th><th>协议 / 地址</th><th>密钥来源</th><th>操作</th></tr></thead>
+    <tbody>@foreach (var p in providers)
+    {
+        <tr @key="p.Id"><td>@p.Name</td><td>@p.Protocol<br />@p.BaseUrl</td><td>@(p.ApiKeyEnvironmentVariable ?? (p.HasApiKey ? "已保存" : "未配置"))</td><td>
+            <button class="btn btn-sm btn-outline-primary" disabled="@Busy" @onclick="() => Select(p)">管理模型</button>
+            <button class="btn btn-sm btn-outline-secondary" disabled="@Busy" @onclick="() => Edit(p)">编辑提供商</button>
+            <button class="btn btn-sm btn-outline-danger" disabled="@Busy" @onclick="() => Delete(p)">删除提供商</button>
+        </td></tr>
+    }</tbody>
+</table>
+</div>
+@if (providerInput is not null)
+{
+    <section class="border rounded p-3 mb-4"><h2>@(providerId is null ? "新建提供商" : "编辑提供商")</h2>
+    <ProviderForm Value="providerInput" Busy="Busy" Save="SaveProvider" Cancel="() => providerInput = null" /></section>
+}
+@if (selected is not null)
+{
+    <section><h2>@selected.Name 的模型</h2>
+    <button class="btn btn-primary mb-3" disabled="@Busy" @onclick="NewModel">新建模型</button>
+    @if (models.Count == 0) { <p>该提供商尚未添加模型。</p> }
+    <div class="table-responsive"><table class="table"><thead><tr><th>Model ID</th><th>上下文窗口</th><th>能力</th><th>操作</th></tr></thead><tbody>
+    @foreach (var m in models)
+    {
+        <tr @key="m.Id"><td>@m.ModelId</td><td>@m.ContextWindow</td><td>@Capabilities(m)</td><td>
+            <button class="btn btn-sm btn-outline-secondary" disabled="@Busy" @onclick="() => Edit(m)">编辑模型</button>
+            <button class="btn btn-sm btn-outline-danger" disabled="@Busy" @onclick="() => Delete(m)">删除模型</button>
+        </td></tr>
+    }
+    </tbody></table></div>
+    @if (modelInput is not null)
+    {
+        <section class="border rounded p-3"><h3>@(modelId is null ? "新建模型" : "编辑模型")</h3>
+            <ModelForm Value="modelInput" Busy="Busy" Save="SaveModel" Cancel="() => modelInput = null" />
+        </section>
+    }
+    </section>
+}
+
+@code {
+    private List<ProviderDto> providers = [];
+    private List<ModelDto> models = [];
+    private ProviderDto? selected;
+    private ProviderInput? providerInput;
+    private ModelInput? modelInput;
+    private Guid? providerId, modelId;
+
+    protected override Task OnInitializedAsync() => Run(Load);
+    private async Task Load()
+    {
+        providers = await Api.Get<List<ProviderDto>>("api/providers");
+        if (selected is not null)
+        {
+            selected = providers.FirstOrDefault(p => p.Id == selected.Id);
+            models = selected is null ? [] : await Api.Get<List<ModelDto>>($"api/models?providerId={selected.Id}");
+        }
+    }
+    private void NewProvider() { providerId = null; providerInput = new(); }
+    private void Edit(ProviderDto p)
+    {
+        providerId = p.Id;
+        providerInput = new() { Name = p.Name, Protocol = p.Protocol, BaseUrl = p.BaseUrl,
+            TranscriptionModel = p.TranscriptionModel };
+    }
+    private Task Select(ProviderDto p) => Run(async () =>
+    {
+        selected = p; modelInput = null;
+        models = await Api.Get<List<ModelDto>>($"api/models?providerId={p.Id}");
+    });
+    private Task SaveProvider() => Run(async () =>
+    {
+        await Api.Send(providerId is null ? HttpMethod.Post : HttpMethod.Put,
+            providerId is null ? "api/providers" : $"api/providers/{providerId}", providerInput);
+        providerInput = null; await Load();
+    });
+    private Task Delete(ProviderDto p) => Run(async () =>
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"删除提供商「{p.Name}」及其全部模型？历史分析任务将保留，模型关联会被清空。")) return;
+        await Api.Delete($"api/providers/{p.Id}");
+        if (providerId == p.Id) providerInput = null;
+        modelInput = null; await Load();
+    });
+    private void NewModel() { modelId = null; modelInput = new() { ProviderId = selected!.Id }; }
+    private void Edit(ModelDto m)
+    {
+        modelId = m.Id;
+        modelInput = new() { ProviderId = m.ProviderId, ModelId = m.ModelId, ContextWindow = m.ContextWindow,
+            SupportsReasoning = m.SupportsReasoning, SupportsToolCalling = m.SupportsToolCalling,
+            SupportsStreaming = m.SupportsStreaming, SupportsImage = m.SupportsImage,
+            SupportsAudio = m.SupportsAudio, SupportsVideo = m.SupportsVideo };
+    }
+    private Task SaveModel() => Run(async () =>
+    {
+        await Api.Send(modelId is null ? HttpMethod.Post : HttpMethod.Put,
+            modelId is null ? "api/models" : $"api/models/{modelId}", modelInput);
+        modelInput = null; await Load();
+    });
+    private Task Delete(ModelDto m) => Run(async () =>
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"删除模型「{m.ModelId}」？历史任务保留，模型关联清空。")) return;
+        await Api.Delete($"api/models/{m.Id}");
+        if (modelId == m.Id) modelInput = null;
+        await Load();
+    });
+    private static string Capabilities(ModelInput m) => string.Join("、", new[]
+    {
+        m.SupportsReasoning ? "思考" : null, m.SupportsToolCalling ? "工具" : null,
+        m.SupportsStreaming ? "流式" : null, m.SupportsImage ? "图片" : null,
+        m.SupportsAudio ? "音频" : null, m.SupportsVideo ? "视频" : null
+    }.Where(x => x is not null));
+}

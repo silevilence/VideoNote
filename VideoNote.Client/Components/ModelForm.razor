@@ -1,0 +1,24 @@
+@using VideoNote.Shared.Contracts
+<EditForm Model="Value" OnValidSubmit="Save" FormName="model">
+    <DataAnnotationsValidator /><ValidationSummary />
+    <fieldset disabled="@Busy">
+        <div class="mb-3"><label for="model-name">Model ID</label><InputText id="model-name" class="form-control" @bind-Value="Value.ModelId" /></div>
+        <div class="mb-3"><label for="model-context">上下文窗口（token）</label><InputNumber id="model-context" class="form-control" @bind-Value="Value.ContextWindow" /></div>
+        <fieldset class="mb-3"><legend class="fs-6">模型能力（可任意组合）</legend>
+            <label class="me-3"><InputCheckbox @bind-Value="Value.SupportsReasoning" /> 思考</label>
+            <label class="me-3"><InputCheckbox @bind-Value="Value.SupportsToolCalling" /> 工具调用</label>
+            <label class="me-3"><InputCheckbox @bind-Value="Value.SupportsStreaming" /> 流式</label>
+            <label class="me-3"><InputCheckbox @bind-Value="Value.SupportsImage" /> 图片</label>
+            <label class="me-3"><InputCheckbox @bind-Value="Value.SupportsAudio" /> 音频</label>
+            <label class="me-3"><InputCheckbox @bind-Value="Value.SupportsVideo" /> 视频</label>
+        </fieldset>
+        <button class="btn btn-primary" type="submit">保存模型</button>
+        <button class="btn btn-outline-secondary ms-2" type="button" @onclick="Cancel">取消</button>
+    </fieldset>
+</EditForm>
+@code {
+    [Parameter, EditorRequired] public ModelInput Value { get; set; } = new();
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback Save { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+}

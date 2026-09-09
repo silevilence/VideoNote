@@ -1,0 +1,26 @@
+@using VideoNote.Shared.Contracts
+
+<EditForm Model="Value" OnValidSubmit="Save" FormName="provider">
+    <DataAnnotationsValidator /><ValidationSummary />
+    <fieldset disabled="@Busy">
+        <div class="mb-3"><label for="provider-name">名称</label><InputText id="provider-name" class="form-control" @bind-Value="Value.Name" /></div>
+        <div class="mb-3"><label for="provider-protocol">协议</label>
+            <InputSelect id="provider-protocol" class="form-select" @bind-Value="Value.Protocol"><option value="openai-compatible">OpenAI 兼容</option><option value="gemini-native">Gemini 原生</option></InputSelect>
+        </div>
+        <div class="mb-3"><label for="provider-url">Base URL</label><InputText id="provider-url" class="form-control" @bind-Value="Value.BaseUrl" /></div>
+        <div class="mb-3"><label for="provider-key">新 API Key</label><InputText id="provider-key" type="password" autocomplete="new-password" class="form-control" @bind-Value="Value.ApiKey" />
+            <small>编辑时留空保留当前密钥；与环境变量名称二选一。</small>
+        </div>
+        <div class="mb-3"><label for="provider-env">密钥环境变量名称</label><InputText id="provider-env" class="form-control" @bind-Value="Value.ApiKeyEnvironmentVariable" /><small>只保存名称，程序调用模型时从服务端环境读取。</small></div>
+        <div class="mb-3"><label><InputCheckbox @bind-Value="Value.ClearApiKey" /> 清除已存密钥或环境变量引用（需清空上面两项）</label></div>
+        <div class="mb-3"><label for="provider-transcription">转写模型（可选）</label><InputText id="provider-transcription" class="form-control" @bind-Value="Value.TranscriptionModel" /></div>
+        <button class="btn btn-primary" type="submit">保存提供商</button>
+        <button class="btn btn-outline-secondary ms-2" type="button" @onclick="Cancel">取消</button>
+    </fieldset>
+</EditForm>
+@code {
+    [Parameter, EditorRequired] public ProviderInput Value { get; set; } = new();
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback Save { get; set; }
+    [Parameter] public EventCallback Cancel { get; set; }
+}
