@@ -22,7 +22,7 @@ public sealed class StorageEdgeTests
         var root = Path.Combine(Path.GetTempPath(), "VideoNote-storage-tests", Guid.NewGuid().ToString("N"));
         var paths = WorkDirectoryPaths.Create(root, new WorkDirectoryOptions());
         new WorkDirectoryInitializer(paths).Initialize();
-        var store = new VideoFileStore(paths, Options.Create(new UploadOptions()));
+        var store = new VideoFileStore(paths, Options.Create(new UploadOptions { AllowedExtensions = [".mp4"] }));
         var id = Guid.NewGuid();
         try
         {

@@ -96,7 +96,7 @@ public sealed class UploadTests
         var root = Path.Combine(Path.GetTempPath(), "VideoNote-upload-tests", Guid.NewGuid().ToString("N"));
         var paths = WorkDirectoryPaths.Create(root, new WorkDirectoryOptions());
         new WorkDirectoryInitializer(paths).Initialize();
-        var store = new VideoFileStore(paths, Options.Create(new UploadOptions()));
+        var store = new VideoFileStore(paths, Options.Create(new UploadOptions { AllowedExtensions = [".mp4"] }));
         try
         {
             await Assert.ThrowsAsync<IOException>(() => store.SaveAsync(Guid.NewGuid(), "test.mp4", new BrokenStream(), null, default));
