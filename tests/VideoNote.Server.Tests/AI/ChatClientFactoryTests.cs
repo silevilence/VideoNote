@@ -21,9 +21,11 @@ namespace VideoNote.Server.Tests.AI;
 public sealed class ChatClientFactoryTests
 {
     [Theory]
-    [InlineData(ProviderProtocol.OpenAiCompatible)]
-    [InlineData(ProviderProtocol.GeminiNative)]
-    public async Task Same_caller_handles_text_streaming_images_and_configuration_changes(ProviderProtocol protocol)
+    [InlineData(ProviderProtocol.OpenAiCompatible, true)]
+    [InlineData(ProviderProtocol.OpenAiCompatible, false)]
+    [InlineData(ProviderProtocol.GeminiNative, true)]
+    [InlineData(ProviderProtocol.GeminiNative, false)]
+    public async Task Same_caller_handles_text_streaming_images_and_configuration_changes(ProviderProtocol protocol, bool versioned)
     {
         var requests = new ConcurrentQueue<(string Path, string Body)>();
         var builder = WebApplication.CreateBuilder();
@@ -49,8 +51,12 @@ public sealed class ChatClientFactoryTests
         await connection.OpenAsync();
         await using var db = new VideoNoteDbContext(new DbContextOptionsBuilder<VideoNoteDbContext>().UseSqlite(connection).Options);
         await db.Database.EnsureCreatedAsync();
-        var model = new ModelConfig { ModelId = "test-model", ContextWindow = 1000,
-            Provider = new Provider { Name = "test", BaseUrl = server.Urls.Single() + (protocol == ProviderProtocol.OpenAiCompatible ? "/v1" : "/v1beta"), Protocol = protocol, ApiKey = "test-only" } };
+        var model = new ModelConfig
+        {
+            ModelId = "test-model",
+            ContextWindow = 1000,
+            Provider = new Provider { Name = "test", BaseUrl = server.Urls.Single() + (versioned ? (protocol == ProviderProtocol.OpenAiCompatible ? "/v1" : "/v1beta") : ""), Protocol = protocol, ApiKey = "test-only" }
+        };
         db.ModelConfigs.Add(model); await db.SaveChangesAsync();
         var factory = new ChatClientFactory(db, new ProviderSecrets(new EphemeralDataProtectionProvider()));
         using (var client = await factory.CreateAsync(model.Id))
@@ -77,10 +83,16 @@ public sealed class ChatClientFactoryTests
         model.ModelId = "changed-model"; await db.SaveChangesAsync();
         using (var client = await factory.CreateAsync(model.Id)) await client.GetResponseAsync("Changed");
         var sent = requests.ToArray();
-        Assert.Contains(sent, r => r.Path.Contains(protocol == ProviderProtocol.GeminiNative ? "/v1beta/models/test-model:generateContent" : "/v1/chat/completions"));
+        Assert.Contains(sent, r => r.Path.Contains(protocol == ProviderProtocol.GeminiNative ? "/v1beta/models/test-model:generateContent" : (versioned ? "/v1/chat/completions" : "/chat/completions")));
         Assert.Contains(sent, r => r.Body.Contains("image/png") || r.Body.Contains("image_url"));
         Assert.Contains(sent, r => r.Body.Contains("changed-model") || r.Path.Contains("changed-model"));
         await Assert.ThrowsAsync<InvalidOperationException>(() => factory.CreateAsync(Guid.NewGuid()));
+        if (protocol == ProviderProtocol.GeminiNative)
+        {
+            model.Provider.ApiKey = "";
+            await db.SaveChangesAsync();
+            await Assert.ThrowsAsync<InvalidOperationException>(() => factory.CreateAsync(model.Id));
+        }
         await server.StopAsync();
     }
 

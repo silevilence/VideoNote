@@ -5,8 +5,17 @@ namespace VideoNote.Client.Services;
 
 public sealed class ApiClient(HttpClient http)
 {
-    public async Task<T> Get<T>(string path) => await http.GetFromJsonAsync<T>(path)
-        ?? throw new InvalidOperationException("服务端返回空响应。");
+    public async Task<T> Get<T>(string path)
+    {
+        using var response = await http.GetAsync(path);
+        await EnsureSuccess(response);
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<T>()
+                ?? throw new InvalidOperationException("服务端返回空响应。");
+        }
+        catch (JsonException) { throw new InvalidOperationException("服务端返回的数据格式无效。"); }
+    }
     public async Task Send<T>(HttpMethod method, string path, T input)
     {
         using var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(input) };

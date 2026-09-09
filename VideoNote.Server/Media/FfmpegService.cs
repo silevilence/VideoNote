@@ -62,9 +62,17 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
         if (!info.HasVideo) throw new InvalidOperationException("源文件不包含视频流。");
         // A fresh operation directory prevents stale frames surviving retries with a shorter input.
         var directory = Directory.CreateDirectory(Path.Combine(paths.Frames, taskId.ToString("N"), Guid.NewGuid().ToString("N"))).FullName;
-        await runner.RunAsync(settings.FfmpegPath, ["-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+        try
+        {
+            await runner.RunAsync(settings.FfmpegPath, ["-hide_banner", "-loglevel", "error", "-nostdin", "-y",
             "-i", source, "-map", "0:v:0", "-vf", $"fps={Number(settings.FramesPerSecond)}:start_time=0",
             "-q:v", "2", Path.Combine(directory, "frame_%010d.jpg")], ct);
+        }
+        catch
+        {
+            Directory.Delete(directory, recursive: true);
+            throw;
+        }
         var frames = new List<VideoFrame>();
         foreach (var file in Directory.GetFiles(directory, "frame_*.jpg").Order(StringComparer.Ordinal))
         {
@@ -99,7 +107,15 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
 
     private async Task EncodeAsync(IEnumerable<string> arguments, string output, CancellationToken ct)
     {
-        try { await runner.RunAsync(settings.FfmpegPath, new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-y" }.Concat(arguments).Append(output), ct); }
-        catch { if (File.Exists(output)) File.Delete(output); throw; }
+        // Keep a previous successful artifact intact until the replacement is complete.
+        var temporary = Path.Combine(Path.GetDirectoryName(output)!,
+            Guid.NewGuid().ToString("N") + ".partial" + Path.GetExtension(output));
+        try
+        {
+            await runner.RunAsync(settings.FfmpegPath,
+                new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-y" }.Concat(arguments).Append(temporary), ct);
+            File.Move(temporary, output, overwrite: true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 }

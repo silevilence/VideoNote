@@ -11,10 +11,16 @@ public sealed class ModelsController(VideoNoteDbContext db) : ControllerBase
 {
     private static ModelDto Dto(ModelConfig m) => new()
     {
-        Id = m.Id, ProviderId = m.ProviderId, ModelId = m.ModelId, ContextWindow = m.ContextWindow,
-        SupportsReasoning = m.SupportsReasoning, SupportsToolCalling = m.SupportsToolCalling,
-        SupportsStreaming = m.SupportsStreaming, SupportsImage = m.SupportsImage,
-        SupportsAudio = m.SupportsAudio, SupportsVideo = m.SupportsVideo
+        Id = m.Id,
+        ProviderId = m.ProviderId,
+        ModelId = m.ModelId,
+        ContextWindow = m.ContextWindow,
+        SupportsReasoning = m.SupportsReasoning,
+        SupportsToolCalling = m.SupportsToolCalling,
+        SupportsStreaming = m.SupportsStreaming,
+        SupportsImage = m.SupportsImage,
+        SupportsAudio = m.SupportsAudio,
+        SupportsVideo = m.SupportsVideo
     };
 
     [HttpGet]

@@ -23,6 +23,8 @@ public sealed class ChatClientFactory(VideoNoteDbContext db, ProviderSecrets sec
             .SingleOrDefaultAsync(m => m.Id == modelConfigId, cancellationToken)
             ?? throw new InvalidOperationException("模型配置不存在，可能已被删除。");
         var key = secrets.Resolve(model.Provider.ApiKey);
+        if (model.Provider.Protocol == ProviderProtocol.GeminiNative && string.IsNullOrEmpty(key))
+            throw new InvalidOperationException("Gemini 提供商尚未配置密钥或环境变量引用。");
         var endpoint = new Uri(model.Provider.BaseUrl.TrimEnd('/') + "/");
         IChatClient client = model.Provider.Protocol switch
         {
@@ -44,8 +46,12 @@ public sealed class ChatClientFactory(VideoNoteDbContext db, ProviderSecrets sec
         var path = endpoint.AbsolutePath.TrimEnd('/');
         var last = path.Split('/').Last();
         return last is "v1" or "v1beta" or "v1alpha"
-            ? new HttpOptions { BaseUrl = endpoint.GetLeftPart(UriPartial.Authority) + path[..^(last.Length + 1)],
-                ApiVersion = last, Timeout = 120000 }
+            ? new HttpOptions
+            {
+                BaseUrl = endpoint.GetLeftPart(UriPartial.Authority) + path[..^(last.Length + 1)],
+                ApiVersion = last,
+                Timeout = 120000
+            }
             : new HttpOptions { BaseUrl = endpoint.ToString().TrimEnd('/'), ApiVersion = "v1beta", Timeout = 120000 };
     }
 

@@ -29,7 +29,8 @@ export function upload(input, metadata, receiver) {
             else reject(new Error(body.message || Object.values(body.errors || {}).flat().join(" ") || "上传失败（" + xhr.status + "）。"));
         };
         // Native File body: browser streams from disk; video bytes never cross the WASM boundary.
-        xhr.send(file);
+        try { xhr.send(file); }
+        catch { fail("无法开始上传，请重试。"); }
     });
 }
 export function cancel(input) { active.get(input)?.abort(); }

@@ -40,9 +40,18 @@ public sealed class ConfigurationApiTests
         await client.PutAsJsonAsync($"/api/providers/{p.Id}", input);
         Assert.False((await client.GetFromJsonAsync<ProviderDto>($"/api/providers/{p.Id}"))!.HasApiKey);
 
-        var model = new ModelInput { ProviderId = p.Id, ModelId = "vision", ContextWindow = 1000,
-            SupportsReasoning = true, SupportsToolCalling = true, SupportsStreaming = true,
-            SupportsImage = true, SupportsAudio = true, SupportsVideo = true };
+        var model = new ModelInput
+        {
+            ProviderId = p.Id,
+            ModelId = "vision",
+            ContextWindow = 1000,
+            SupportsReasoning = true,
+            SupportsToolCalling = true,
+            SupportsStreaming = true,
+            SupportsImage = true,
+            SupportsAudio = true,
+            SupportsVideo = true
+        };
         response = await client.PostAsJsonAsync("/api/models", model);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var m = (await response.Content.ReadFromJsonAsync<ModelDto>())!;

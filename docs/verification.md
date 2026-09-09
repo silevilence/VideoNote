@@ -38,3 +38,19 @@
 - 内置大纲/重点/摘要/关键词只读；复制产生独立自建模板。API 与真实浏览器完成创建、查看、编辑、删除、刷新持久化。
 - 上传页可选任意模板并预览；任务保存 PromptContentSnapshot。模板修改/删除后历史快照保持不变，删除外键置空。
 - 浏览器复现：node tests/browser/prompts.cjs，验证内置保护、复制、模板选择与删除后快照。
+
+## 最终回归
+- 39 个测试通过，0 失败、0 跳过。
+- 覆盖率：dotnet test tests/VideoNote.Server.Tests --collect "XPlat Code Coverage" --settings tests/coverage.runsettings --results-directory work-tests/coverage-final
+- 服务端/共享代码行覆盖率 97.86%（686/701），分支覆盖率 85.19%；客户端单独通过三组真实浏览器验证，不包含在该覆盖率中。
+- dotnet publish VideoNote.Server -c Release -o work-tests/publish 成功；从该独立发布目录启动 Production 服务后，三个浏览器脚本全部通过。
+- dotnet ef migrations has-pending-model-changes --project VideoNote.Server --no-build：无待生成迁移。
+- 整体审核修复与剩余验证边界见 review-2026-09-09.md。
+
+## 使用本轮功能
+1. 在仓库根目录运行 dotnet run --project VideoNote.Server --launch-profile http，然后打开启动日志中的本地地址。
+2. 模型设置 → 新建提供商：名称 DeepSeek，协议 OpenAI 兼容，Base URL 为 https://api.deepseek.com，密钥环境变量名称为 DEEPSEEK_API_KEY；API Key 输入留空。
+3. 在该提供商下新建模型：Model ID 为 deepseek-v4-flash-vision-exp，勾选图片和流式。上下文窗口按实际模型规格填写，表单默认值不是对模型规格的声明。
+4. 在提示词模板页复制内置模板或创建自定义模板；上传验证页可选择模型、模式和模板，保存视频并验证持久化及删除。
+5. 服务进程需要继承所配置的环境变量。更改 Windows 环境变量后，重新启动服务进程。程序不在 API 列表/详情中返回密钥。
+6. 数据库和媒体在服务端 work 目录；使用直接输入的密钥时，还需要保留 work/keys 才能解密已有配置。该目录应作为本地应用数据管理，不纳入 Git。

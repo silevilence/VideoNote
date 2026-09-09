@@ -21,7 +21,7 @@ public sealed class VideoFileStore(WorkDirectoryPaths paths, IOptions<UploadOpti
         var directory = TaskDirectories(id).First();
         EnsureNoLinks(directory);
         Directory.CreateDirectory(directory);
-        var temporary = Path.Combine(directory, ".uploading");
+        var temporary = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".uploading");
         var final = Path.Combine(directory, "source" + Path.GetExtension(fileName).ToLowerInvariant());
         var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
         try
@@ -46,7 +46,6 @@ public sealed class VideoFileStore(WorkDirectoryPaths paths, IOptions<UploadOpti
         catch
         {
             if (File.Exists(temporary)) File.Delete(temporary);
-            if (File.Exists(final)) File.Delete(final);
             if (Directory.Exists(directory) && !Directory.EnumerateFileSystemEntries(directory).Any()) Directory.Delete(directory);
             throw;
         }

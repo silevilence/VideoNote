@@ -1,4 +1,5 @@
 namespace VideoNote.Server.Storage;
+
 public sealed class UploadOptions
 {
     public long MaxBytes { get; set; } = 1024L * 1024 * 1024;

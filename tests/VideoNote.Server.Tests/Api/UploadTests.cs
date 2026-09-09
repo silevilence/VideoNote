@@ -20,7 +20,7 @@ public sealed class UploadTests
     public async Task Large_valid_video_streams_intact_and_deletion_cleans_all_materials()
     {
         await using var app = new ApiFactory();
-        using var client = app.CreateClient();
+        using var client = app.CreateClient(new() { AllowAutoRedirect = false });
         client.Timeout = TimeSpan.FromMinutes(3);
         var paths = app.Services.GetRequiredService<WorkDirectoryPaths>();
         var source = Path.Combine(paths.Root, "large-test.mp4");
@@ -81,7 +81,7 @@ public sealed class UploadTests
     public async Task Invalid_uploads_leave_no_task_or_partial_file(string name, int size, bool chunked, int status)
     {
         await using var app = new ApiFactory(new() { ["Upload:MaxBytes"] = "1024" });
-        using var client = app.CreateClient();
+        using var client = app.CreateClient(new() { AllowAutoRedirect = false });
         using HttpContent content = chunked ? new UnknownLengthContent(new byte[size]) : new ByteArrayContent(new byte[size]);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         var response = await client.PostAsync("/api/tasks?fileName=" + Uri.EscapeDataString(name), content);

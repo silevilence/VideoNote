@@ -32,8 +32,15 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
         if (input.PromptTemplateId.HasValue && !await db.PromptTemplates.AnyAsync(p => p.Id == input.PromptTemplateId, ct))
             return BadRequest(new { message = "所选模板不存在。" });
         var prompt = input.PromptTemplateId.HasValue ? await db.PromptTemplates.FindAsync([input.PromptTemplateId.Value], ct) : null;
-        var task = new AnalysisTask { OriginalFileName = input.FileName, Mode = input.Mode, ModelConfigId = input.ModelConfigId,
-            PromptTemplateId = input.PromptTemplateId, PromptContentSnapshot = prompt?.Content, StageDescription = "已保存：功能验证任务，尚未接入分析管线。" };
+        var task = new AnalysisTask
+        {
+            OriginalFileName = input.FileName,
+            Mode = input.Mode,
+            ModelConfigId = input.ModelConfigId,
+            PromptTemplateId = input.PromptTemplateId,
+            PromptContentSnapshot = prompt?.Content,
+            StageDescription = "已保存：功能验证任务，尚未接入分析管线。"
+        };
         try
         {
             task.VideoPath = await files.SaveAsync(task.Id, input.FileName, Request.Body, Request.ContentLength, ct);

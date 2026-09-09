@@ -9,10 +9,16 @@ public sealed class MediaProcessRunner(IOptions<FfmpegOptions> options)
 {
     public async Task<string> RunAsync(string executable, IEnumerable<string> arguments, CancellationToken ct)
     {
-        using var process = new Process { StartInfo = new ProcessStartInfo(executable)
+        using var process = new Process
         {
-            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
-        }};
+            StartInfo = new ProcessStartInfo(executable)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            }
+        };
         foreach (var argument in arguments) process.StartInfo.ArgumentList.Add(argument);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(options.Value.TimeoutSeconds));
@@ -34,7 +40,8 @@ public sealed class MediaProcessRunner(IOptions<FfmpegOptions> options)
         }
         catch (OperationCanceledException)
         {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) when (process.HasExited) { }
             await process.WaitForExitAsync(CancellationToken.None);
             await Task.WhenAll(stdout, stderr);
             if (ct.IsCancellationRequested) throw;
