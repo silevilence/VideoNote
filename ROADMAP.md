@@ -63,9 +63,19 @@
 
 ## 🚧 开发中 (In Progress)
 
-本轮确认（2026-09-09）：按下列六项顺序开发、审核修复、原地勾选并分别本地提交，最后整体审核。UI 以功能验证与可维护为主。补充最小任务创建/查询/删除 API 和验证页面，不执行尚未实现的分析管线。上传默认上限 1 GiB，扩展名 mp4/mkv/mov/webm/avi/m4v，均可配置；提供可复现视频生成脚本。内置提示词只读，可复制后编辑；自建模板完整 CRUD。密钥加密存储，编辑留空保留、显式清除，并支持运行时读取环境变量。DeepSeek 使用 https://api.deepseek.com、deepseek-v4-flash-vision-exp（OpenAI 兼容、图像能力），程序读取 DEEPSEEK_API_KEY，开发工具不得读取或输出密钥值。Gemini 以协议模拟测试验收，真实端点验证待提供配置后补做。
+## ✅ 已完成 (Completed)
 
-追加确认（2026-09-09）：前端界面按已实现功能完成正式版重设计，替代原功能验证占位界面（暗色放映室设计系统，自建 CSS 替代 Bootstrap 默认样式）：总览仪表盘、新建任务页（拖拽上传、模式卡片、按模式过滤模型能力并允许手动覆盖）、任务列表页（状态筛选）与任务详情页（含提示词快照与管线边界说明）、模型设置与提示词模板卡片化管理。任务上传后跳转详情页；分析管线接入前详情页明确标注报告未开启。删除 Counter/Weather 模板残留页；三个浏览器验证脚本同步更新并全部通过。
+- [x] **搭建解决方案骨架**（Blazor Web App + 分层类库 + 基础设施就绪）
+    - [x] 使用 Blazor Web App 模板（.NET 10，Interactive WebAssembly render mode）创建项目
+    - [x] Client / Server / Shared 三层类库结构，服务端承载 API 与 SignalR
+    - [x] 引入 EF Core + SQLite，创建本地工作目录约定（视频、帧、音频、字幕产物）
+    - 验收：`dotnet run` 可启动，主页正常渲染，三层引用关系清晰构建通过
+
+- [x] **设计数据模型与数据库初始化**（核心实体落库）
+    - [x] 实体：提供商（Provider）、模型配置（ModelConfig）、分析任务（AnalysisTask）、提示词模板（PromptTemplate）、对话消息（ConversationMessage）
+    - [x] 字段覆盖：协议类型、能力标记（思考/工具/流式/图像/音频/视频）、上下文窗口、任务状态、进度、结果文本、提示词内容
+    - [x] 初始 EF Core Migration 成功生成
+    - 验收：`dotnet ef database update` 创建 SQLite 库，各表结构与字段完整，基础 CRUD 冒烟通过
 
 - [x] **提供商与模型配置 API**（两级配置的服务端接口）
     - [x] 提供商 CRUD：名称、协议类型（openai-compatible / gemini-native）、BaseUrl、ApiKey、可选转写模型
@@ -101,17 +111,3 @@
     - [x] 内置模板：大纲提取、重点提取、摘要、关键词
     - [x] 模板 CRUD API 与管理 UI（新建/编辑/删除/复制内置模板）
     - 验收：模板增删改查可用并持久化，任务创建时可选用任意模板
-
-## ✅ 已完成 (Completed)
-
-- [x] **搭建解决方案骨架**（Blazor Web App + 分层类库 + 基础设施就绪）
-    - [x] 使用 Blazor Web App 模板（.NET 10，Interactive WebAssembly render mode）创建项目
-    - [x] Client / Server / Shared 三层类库结构，服务端承载 API 与 SignalR
-    - [x] 引入 EF Core + SQLite，创建本地工作目录约定（视频、帧、音频、字幕产物）
-    - 验收：`dotnet run` 可启动，主页正常渲染，三层引用关系清晰构建通过
-
-- [x] **设计数据模型与数据库初始化**（核心实体落库）
-    - [x] 实体：提供商（Provider）、模型配置（ModelConfig）、分析任务（AnalysisTask）、提示词模板（PromptTemplate）、对话消息（ConversationMessage）
-    - [x] 字段覆盖：协议类型、能力标记（思考/工具/流式/图像/音频/视频）、上下文窗口、任务状态、进度、结果文本、提示词内容
-    - [x] 初始 EF Core Migration 成功生成
-    - 验收：`dotnet ef database update` 创建 SQLite 库，各表结构与字段完整，基础 CRUD 冒烟通过
