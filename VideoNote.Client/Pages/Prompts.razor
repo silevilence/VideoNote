@@ -7,32 +7,101 @@
 @using VideoNote.Client.Services
 
 <PageTitle>提示词模板 · VideoNote</PageTitle>
-<h1>提示词模板</h1>
-<p>内置模板只读。复制后可以自由编辑；任务保存后会保留当时的提示词内容。</p>
-@if (Error is not null) { <div class="alert alert-danger" role="alert">@Error</div> }
-@if (Busy) { <p role="status">正在处理…</p> }
-<button class="btn btn-primary mb-3" disabled="@Busy" @onclick="New">新建模板</button>
-<button class="btn btn-outline-secondary mb-3 ms-2" disabled="@Busy" @onclick="() => Run(Load)">刷新</button>
-@if (prompts.Count == 0 && !Busy) { <p>暂无模板。</p> }
-<div class="table-responsive"><table class="table"><thead><tr><th>名称</th><th>来源</th><th>操作</th></tr></thead><tbody>
-@foreach (var p in prompts)
+
+<div class="page-head">
+    <div class="titles">
+        <span class="eyebrow">PROMPT LIBRARY</span>
+        <h1>提示词模板</h1>
+        <p class="page-sub">内置模板只读，复制后可自由编辑。任务保存时会固化当时的提示词内容，之后修改或删除模板均不影响历史任务。</p>
+    </div>
+    <div class="head-actions">
+        <button type="button" class="btn btn-ghost" disabled="@Busy" @onclick="() => Run(Load)">刷新</button>
+        <button type="button" class="btn btn-primary" disabled="@Busy" @onclick="New">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建模板
+        </button>
+    </div>
+</div>
+
+<ErrorAlert Message="@Error" />
+@if (Busy && prompts.Count == 0)
 {
-    <tr @key="p.Id"><td>@p.Name</td><td>@(p.IsBuiltIn ? "内置" : "自建")</td><td>
-        <button class="btn btn-sm btn-outline-secondary" disabled="@Busy" @onclick="() => View(p)">查看</button>
-        <button class="btn btn-sm btn-outline-primary" disabled="@Busy" @onclick="() => Copy(p)">复制</button>
-        @if (!p.IsBuiltIn)
-        {
-            <button class="btn btn-sm btn-outline-secondary" disabled="@Busy" @onclick="() => Edit(p)">编辑</button>
-            <button class="btn btn-sm btn-outline-danger" disabled="@Busy" @onclick="() => Delete(p)">删除</button>
-        }
-    </td></tr>
+    <LoadingCards Count="3" />
 }
-</tbody></table></div>
-@if (viewed is not null) { <section class="border rounded p-3 mb-3"><h2>@viewed.Name</h2><pre class="text-wrap">@viewed.Content</pre></section> }
+else if (prompts.Count == 0)
+{
+    <div class="empty">
+        <div class="empty-ico">
+            <svg class="ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        </div>
+        <div class="empty-title">暂无模板。</div>
+        <p class="empty-desc">创建一个模板来固定解读重点，例如「提取大纲」「总结要点」。</p>
+        <button type="button" class="btn btn-primary" disabled="@Busy" @onclick="New">新建模板</button>
+    </div>
+}
+else
+{
+    <div class="card-list">
+        @foreach (var p in prompts)
+        {
+            <div class="item" @key="p.Id">
+                <div class="item-main">
+                    <div class="item-title">
+                        @p.Name
+                        @if (p.IsBuiltIn)
+                        {
+                            <span class="chip chip-amber">内置</span>
+                        }
+                        else
+                        {
+                            <span class="chip chip-teal">自建</span>
+                        }
+                    </div>
+                    <div class="item-meta"><span class="tc">更新于 @Ui.Time(p.UpdatedAtUtc)</span></div>
+                </div>
+                <div class="item-actions">
+                    <button type="button" class="btn btn-sm btn-ghost" disabled="@Busy" @onclick="() => View(p)">查看</button>
+                    <button type="button" class="btn btn-sm btn-ghost" disabled="@Busy" @onclick="() => Copy(p)">
+                        <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        复制
+                    </button>
+                    @if (!p.IsBuiltIn)
+                    {
+                        <button type="button" class="btn btn-sm btn-ghost" disabled="@Busy" @onclick="() => Edit(p)">编辑</button>
+                        <button type="button" class="icon-btn danger" title="删除" aria-label="删除" disabled="@Busy" @onclick="() => Delete(p)">
+                            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (viewed is not null)
+{
+    <section class="panel" style="margin-top:1rem;">
+        <h2 class="panel-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            @viewed.Name
+            @if (viewed.IsBuiltIn)
+            {
+                <span class="chip chip-amber">内置</span>
+            }
+        </h2>
+        <div class="preview-box"><pre>@viewed.Content</pre></div>
+    </section>
+}
+
 @if (input is not null)
 {
-    <section class="border rounded p-3"><h2>@(id is null ? "新建模板" : "编辑模板")</h2>
-    <PromptForm Value="input" Busy="Busy" Save="Save" Cancel="() => input = null" /></section>
+    <section class="panel" style="margin-top:1rem;">
+        <h2 class="panel-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            @(id is null ? "新建模板" : "编辑模板")
+        </h2>
+        <PromptForm Value="input" Busy="Busy" Save="Save" Cancel="() => input = null" />
+    </section>
 }
 
 @code {

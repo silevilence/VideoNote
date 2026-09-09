@@ -1,0 +1,292 @@
+@page "/tasks/new"
+@inherits OperationPage
+@implements IAsyncDisposable
+@inject ApiClient Api
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@using VideoNote.Shared.Contracts
+@using VideoNote.Shared.Domain
+@using VideoNote.Client.Components
+@using VideoNote.Client.Services
+
+<PageTitle>新建任务 · VideoNote</PageTitle>
+
+<div class="page-head">
+    <div class="titles">
+        <span class="eyebrow">NEW SCREENING</span>
+        <h1>新建解读任务</h1>
+        <p class="page-sub">上传视频，选择理解模式、模型与提示词。保存后任务进入队列；分析管线接入前仅保存视频与配置。</p>
+    </div>
+    <div class="head-actions">
+        <NavLink class="btn btn-ghost" href="tasks">任务列表</NavLink>
+    </div>
+</div>
+
+<ErrorAlert Message="@Error" />
+<ErrorAlert Message="@uploadError" />
+<NoticeAlert Message="@Notice" />
+
+<div class="panel">
+    <h2 class="panel-title">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+        第一步 · 选择视频
+    </h2>
+    @if (selected is null)
+    {
+        <label class="dropzone" for="video-file" @ref="dropzone">
+            <span class="dz-ico">
+                <svg class="ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+            </span>
+            <span class="dz-title">拖放视频到此处，或点击选择文件</span>
+            @if (limits is not null)
+            {
+                <span class="dz-desc">支持 <span class="mono">@string.Join(" / ", limits.AllowedExtensions)</span>，单文件上限 <span class="mono">@Ui.Size(limits.MaxBytes)</span></span>
+            }
+        </label>
+    }
+    else
+    {
+        <div class="file-card">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            <div class="grow">
+                <div class="file-name">@selected.Name</div>
+                <div class="file-size">@Ui.Size(selected.Size)</div>
+            </div>
+            <button type="button" class="icon-btn danger" title="移除所选文件" aria-label="移除所选文件" disabled="@(Busy || uploading)" @onclick="ClearFile">
+                <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+    }
+    <input id="video-file" type="file" accept="@string.Join(",", limits?.AllowedExtensions ?? [])" @ref="fileInput" hidden />
+</div>
+
+<div class="panel">
+    <h2 class="panel-title">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.2"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 7h5M17 17h5"/></svg>
+        第二步 · 理解模式
+    </h2>
+    <div class="seg-grid" role="radiogroup" aria-label="理解模式">
+        @foreach (var mode in (AnalysisMode[])typeof(AnalysisMode).GetEnumValues())
+        {
+            var info = Ui.ModeInfo(mode);
+            <button type="button" class="seg-card @(this.mode == mode ? "is-active" : "")" role="radio"
+                    aria-checked="@(this.mode == mode)" disabled="@(Busy || uploading)" @onclick="() => SetMode(mode)">
+                <span class="seg-head">@info.Title</span>
+                <span class="seg-desc">@info.Description</span>
+                <span class="seg-need"><span class="chip chip-plain">需@(info.Need)能力模型</span></span>
+            </button>
+        }
+    </div>
+</div>
+
+<div class="grid cols-2" style="margin-top:1rem;">
+    <div class="panel" style="margin-top:0;">
+        <h2 class="panel-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+            第三步 · 模型与提示词
+        </h2>
+        <div class="field">
+            <label for="task-model">分析模型</label>
+            @if (models.Count == 0)
+            {
+                <p class="hint">还没有可用模型。<a href="settings">先去模型设置添加提供商与模型</a>，再回来创建任务。</p>
+            }
+            else
+            {
+                var info = Ui.ModeInfo(mode);
+                <select id="task-model" class="form-select" disabled="@(Busy || uploading)" @bind="modelId">
+                    <option value="">暂不指定</option>
+                    @foreach (var m in visibleModels)
+                    {
+                        <option value="@m.Id">@ModelLabel(m)</option>
+                    }
+                </select>
+                <p class="hint">
+                    按「@info.Title」模式已过滤出具备<b>@info.Need</b>能力的模型。
+                    <label class="check" style="margin-top:0.35rem;"><InputCheckbox class="check-input" @bind-Value="showAllModels" @bind-Value:after="OnShowAllChanged" /> 显示全部模型（手动覆盖）</label>
+                </p>
+            }
+        </div>
+        <div class="field" style="margin-bottom:0;">
+            <label for="task-prompt">提示词模板</label>
+            <select id="task-prompt" class="form-select" disabled="@(Busy || uploading)" @bind="promptId">
+                <option value="">不使用模板</option>
+                @foreach (var p in prompts)
+                {
+                    <option value="@p.Id">@p.Name@(p.IsBuiltIn ? "（内置）" : "")</option>
+                }
+            </select>
+            @if (prompts.FirstOrDefault(p => p.Id.ToString() == promptId) is { } selectedPrompt)
+            {
+                <div class="preview-box" style="margin-top:0.6rem;"><pre>@selectedPrompt.Content</pre></div>
+            }
+            else
+            {
+                <p class="hint">不选模板时建议在提示词模板页复制一份内置模板再调整。<a href="prompts">管理模板 →</a></p>
+            }
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top:0;">
+        <h2 class="panel-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            提交任务
+        </h2>
+        <div class="kv-grid" style="margin-bottom:1rem;">
+            <div><div class="kv-key">视频</div><div class="kv-val">@(selected?.Name ?? "未选择")</div></div>
+            <div><div class="kv-key">模式</div><div class="kv-val">@Ui.ModeName(mode)</div></div>
+            <div><div class="kv-key">模型</div><div class="kv-val">@(SelectedModel?.ModelId ?? "暂不指定")</div></div>
+            <div><div class="kv-key">提示词</div><div class="kv-val">@(SelectedPrompt?.Name ?? "不使用")</div></div>
+        </div>
+        @if (uploading)
+        {
+            <p class="small dim" role="status" style="margin-bottom:0.4rem;">@(progress < 100 ? $"上传中 {progress}%" : "上传完成，服务端正在保存…")</p>
+            <div class="progress" style="margin-bottom:0.9rem;"><div class="progress-fill is-busy" style="width:@(Math.Max(progress, 4))%"></div></div>
+            <button type="button" class="btn btn-danger" @onclick="CancelUpload">取消上传</button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-primary" disabled="@(Busy || limits is null)" @onclick="Upload">
+                <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                上传并创建任务
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    private List<ModelDto> models = [];
+    private List<ProviderDto> providers = [];
+    private List<PromptDto> prompts = [];
+    private Dictionary<Guid, string> providerNames = [];
+    private UploadLimitsDto? limits;
+    private ElementReference fileInput;
+    private ElementReference dropzone;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<NewTask>? receiver;
+    private AnalysisMode mode = AnalysisMode.SampledFrames;
+    private string? modelId;
+    private string? promptId;
+    private bool showAllModels;
+    private SelectedFile? selected;
+    private string? uploadError;
+    private bool uploading;
+    private bool disposed;
+    private int progress;
+
+    private IEnumerable<ModelDto> visibleModels => showAllModels ? models : models.Where(m => Ui.ModelMatches(m, mode));
+    private ModelDto? SelectedModel => models.FirstOrDefault(m => m.Id.ToString() == modelId);
+    private PromptDto? SelectedPrompt => prompts.FirstOrDefault(p => p.Id.ToString() == promptId);
+
+    protected override Task OnInitializedAsync() => Run(Load);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./upload.js");
+            receiver ??= DotNetObjectReference.Create(this);
+        }
+        // The dropzone label is recreated whenever the selection clears, so re-wire on every render.
+        if (module is not null && selected is null)
+            await module.InvokeVoidAsync("attachDropzone", dropzone, fileInput, receiver);
+    }
+
+    private async Task Load()
+    {
+        limits = await Api.Get<UploadLimitsDto>("api/tasks/upload-limits");
+        prompts = await Api.Get<List<PromptDto>>("api/prompts");
+        models = await Api.Get<List<ModelDto>>("api/models");
+        providers = await Api.Get<List<ProviderDto>>("api/providers");
+        providerNames = providers.ToDictionary(p => p.Id, p => p.Name);
+    }
+
+    private string ModelLabel(ModelDto m)
+    {
+        var provider = providerNames.TryGetValue(m.ProviderId, out var name) ? name : "未知提供商";
+        var matched = Ui.ModelMatches(m, mode);
+        var note = matched ? "" : $"（无{Ui.ModeInfo(mode).Need}能力）";
+        return $"{provider} · {m.ModelId}{note}";
+    }
+
+    private void SetMode(AnalysisMode value)
+    {
+        mode = value;
+        ClearMismatchedModel();
+    }
+
+    private void OnShowAllChanged()
+    {
+        if (!showAllModels) ClearMismatchedModel();
+    }
+
+    // 取消「显示全部」或切换模式后，被过滤掉的选中模型不再留在提交参数里。
+    private void ClearMismatchedModel()
+    {
+        if (SelectedModel is { } current && !Ui.ModelMatches(current, mode) && !showAllModels) modelId = null;
+    }
+
+    private async Task Upload()
+    {
+        if (uploading || Busy || module is null) return;
+        uploading = true; progress = 0; uploadError = null; Notice = null;
+        try
+        {
+            var file = selected ?? await module.InvokeAsync<SelectedFile?>("selectedFile", fileInput);
+            if (file is null) { uploadError = "请先选择视频。"; return; }
+            if (file.Size == 0 || file.Size > limits!.MaxBytes) { uploadError = "文件为空或超过上传大小上限。"; return; }
+            if (!limits.AllowedExtensions.Contains(Path.GetExtension(file.Name), StringComparer.OrdinalIgnoreCase))
+            {
+                uploadError = "视频扩展名不受支持。";
+                return;
+            }
+            var created = await module.InvokeAsync<TaskDto>("upload", fileInput,
+                new { mode = mode.ToString(), modelConfigId = modelId, promptTemplateId = promptId }, receiver);
+            Nav.NavigateTo($"tasks/{created.Id}");
+        }
+        catch (JSException ex) { uploadError = ex.Message.Split('\n')[0]; }
+        finally { uploading = false; }
+    }
+
+    [JSInvokable]
+    public Task UploadProgress(int value)
+    {
+        if (disposed) return Task.CompletedTask;
+        progress = value;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task FilePicked()
+    {
+        if (disposed || module is null || uploading) return;
+        selected = await module.InvokeAsync<SelectedFile?>("selectedFile", fileInput);
+        uploadError = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ClearFile()
+    {
+        if (module is null) return;
+        await module.InvokeVoidAsync("clearFile", fileInput);
+        selected = null;
+    }
+
+    private async Task CancelUpload()
+    {
+        if (module is not null) await module.InvokeVoidAsync("cancel", fileInput);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (module is not null)
+        {
+            try { await CancelUpload(); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+        receiver?.Dispose();
+    }
+
+    private sealed record SelectedFile(string Name, long Size);
+}

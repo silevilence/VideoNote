@@ -1,5 +1,11 @@
 ﻿@page "/not-found"
 @layout MainLayout
 
-<h3>Not Found</h3>
-<p>Sorry, the content you are looking for does not exist.</p>
+<div class="empty" style="margin-top:4rem;">
+    <div class="empty-ico">
+        <svg class="ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+    </div>
+    <div class="empty-title">404 · 这一帧不存在</div>
+    <p class="empty-desc">要找的页面不在片库里。</p>
+    <NavLink class="btn btn-primary" href="">回到总览</NavLink>
+</div>

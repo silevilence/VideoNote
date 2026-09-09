@@ -38,3 +38,20 @@ export function selectedFile(input) {
     const file = input.files?.[0];
     return file ? {name: file.name, size: file.size} : null;
 }
+export function clearFile(input) { input.value = ""; }
+export function attachDropzone(zone, input, receiver) {
+    if (!zone || zone.dataset.wired) return;
+    zone.dataset.wired = "1";
+    const notify = () => receiver?.invokeMethodAsync("FilePicked").catch(() => {});
+    zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("is-over"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("is-over"));
+    zone.addEventListener("drop", e => {
+        e.preventDefault();
+        zone.classList.remove("is-over");
+        if (e.dataTransfer?.files?.length) {
+            input.files = e.dataTransfer.files;
+            notify();
+        }
+    });
+    input.addEventListener("change", notify);
+}

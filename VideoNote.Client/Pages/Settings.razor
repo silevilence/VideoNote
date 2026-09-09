@@ -3,55 +3,154 @@
 @inject ApiClient Api
 @inject IJSRuntime JS
 @using VideoNote.Shared.Contracts
+@using VideoNote.Shared.Domain
 @using VideoNote.Client.Components
 @using VideoNote.Client.Services
 
 <PageTitle>模型设置 · VideoNote</PageTitle>
-<h1>模型设置</h1>
-<p>管理提供商连接及其模型能力。删除配置后，历史任务保留。</p>
-@if (Error is not null) { <div class="alert alert-danger" role="alert">@Error</div> }
-@if (Busy) { <p role="status">正在处理…</p> }
-<button class="btn btn-primary mb-3" disabled="@Busy" @onclick="NewProvider">新建提供商</button>
-<button class="btn btn-outline-secondary mb-3 ms-2" disabled="@Busy" @onclick="() => Run(Load)">刷新</button>
-@if (providers.Count == 0 && !Busy) { <p>暂无提供商，请先添加。</p> }
-<div class="table-responsive">
-<table class="table">
-    <thead><tr><th>名称</th><th>协议 / 地址</th><th>密钥来源</th><th>操作</th></tr></thead>
-    <tbody>@foreach (var p in providers)
-    {
-        <tr @key="p.Id"><td>@p.Name</td><td>@p.Protocol<br />@p.BaseUrl</td><td>@(p.ApiKeyEnvironmentVariable ?? (p.HasApiKey ? "已保存" : "未配置"))</td><td>
-            <button class="btn btn-sm btn-outline-primary" disabled="@Busy" @onclick="() => Select(p)">管理模型</button>
-            <button class="btn btn-sm btn-outline-secondary" disabled="@Busy" @onclick="() => Edit(p)">编辑提供商</button>
-            <button class="btn btn-sm btn-outline-danger" disabled="@Busy" @onclick="() => Delete(p)">删除提供商</button>
-        </td></tr>
-    }</tbody>
-</table>
+
+<div class="page-head">
+    <div class="titles">
+        <span class="eyebrow">CONTROL ROOM</span>
+        <h1>模型设置</h1>
+        <p class="page-sub">管理提供商连接及其模型能力。删除配置后历史任务保留，仅清空关联。</p>
+    </div>
+    <div class="head-actions">
+        <button type="button" class="btn btn-ghost" disabled="@Busy" @onclick="() => Run(Load)">刷新</button>
+        <button type="button" class="btn btn-primary" disabled="@Busy" @onclick="NewProvider">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建提供商
+        </button>
+    </div>
 </div>
+
+@if (Error is not null)
+{
+    <ErrorAlert Message="@Error" />
+}
+@if (Busy && providers.Count == 0)
+{
+    <LoadingCards Count="2" />
+}
+else if (providers.Count == 0)
+{
+    <div class="empty">
+        <div class="empty-ico">
+            <svg class="ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+        </div>
+        <div class="empty-title">暂无提供商，请先添加。</div>
+        <p class="empty-desc">支持 OpenAI 兼容与 Gemini 原生两种协议。密钥可直存（加密）或引用服务端环境变量。</p>
+        <button type="button" class="btn btn-primary" disabled="@Busy" @onclick="NewProvider">新建提供商</button>
+    </div>
+}
+else
+{
+    <div class="card-list">
+        @foreach (var p in providers)
+        {
+                <div class="item" @key="p.Id" style="@(selected?.Id == p.Id ? "border-color:rgba(240,179,92,0.5);" : "")">
+                <div class="item-main">
+                    <div class="item-title">@p.Name</div>
+                    <div class="item-meta">
+                        <span class="chip chip-plain">@ProtocolName(p.Protocol)</span>
+                        <span class="mono small">@p.BaseUrl</span>
+                    </div>
+                    <div class="item-meta">
+                        @if (p.ApiKeyEnvironmentVariable is { } env)
+                        {
+                            <span class="chip chip-blue" title="密钥从服务端环境变量读取">ENV @env</span>
+                        }
+                        else if (p.HasApiKey)
+                        {
+                            <span class="chip chip-teal">密钥已加密保存</span>
+                        }
+                        else
+                        {
+                            <span class="chip chip-slate">未配置密钥</span>
+                        }
+                        @if (p.TranscriptionModel is { } tm)
+                        {
+                            <span class="chip chip-violet" title="转写模型">转写 @tm</span>
+                        }
+                    </div>
+                </div>
+                <div class="item-actions">
+                    <button type="button" class="btn btn-sm @(selected?.Id == p.Id ? "btn-primary" : "btn-ghost")" disabled="@Busy" @onclick="() => Select(p)">管理模型</button>
+                    <button type="button" class="btn btn-sm btn-ghost" disabled="@Busy" @onclick="() => Edit(p)">编辑提供商</button>
+                    <button type="button" class="icon-btn danger" title="删除提供商" aria-label="删除提供商" disabled="@Busy" @onclick="() => Delete(p)">
+                        <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
 @if (providerInput is not null)
 {
-    <section class="border rounded p-3 mb-4"><h2>@(providerId is null ? "新建提供商" : "编辑提供商")</h2>
-    <ProviderForm Value="providerInput" Busy="Busy" Save="SaveProvider" Cancel="() => providerInput = null" /></section>
+    <section class="panel" style="margin-top:1rem;">
+        <h2 class="panel-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+            @(providerId is null ? "新建提供商" : "编辑提供商")
+        </h2>
+        <ProviderForm Value="providerInput" Busy="Busy" Save="SaveProvider" Cancel="() => providerInput = null" />
+    </section>
 }
+
 @if (selected is not null)
 {
-    <section><h2>@selected.Name 的模型</h2>
-    <button class="btn btn-primary mb-3" disabled="@Busy" @onclick="NewModel">新建模型</button>
-    @if (models.Count == 0) { <p>该提供商尚未添加模型。</p> }
-    <div class="table-responsive"><table class="table"><thead><tr><th>Model ID</th><th>上下文窗口</th><th>能力</th><th>操作</th></tr></thead><tbody>
-    @foreach (var m in models)
-    {
-        <tr @key="m.Id"><td>@m.ModelId</td><td>@m.ContextWindow</td><td>@Capabilities(m)</td><td>
-            <button class="btn btn-sm btn-outline-secondary" disabled="@Busy" @onclick="() => Edit(m)">编辑模型</button>
-            <button class="btn btn-sm btn-outline-danger" disabled="@Busy" @onclick="() => Delete(m)">删除模型</button>
-        </td></tr>
-    }
-    </tbody></table></div>
-    @if (modelInput is not null)
-    {
-        <section class="border rounded p-3"><h3>@(modelId is null ? "新建模型" : "编辑模型")</h3>
-            <ModelForm Value="modelInput" Busy="Busy" Save="SaveModel" Cancel="() => modelInput = null" />
-        </section>
-    }
+    <section class="panel" style="margin-top:1rem; border-color:rgba(240,179,92,0.35);">
+        <h2 class="panel-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.2"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 7h5M17 17h5"/></svg>
+            「@selected.Name」的模型
+            <span class="grow"></span>
+            <button type="button" class="btn btn-sm btn-primary" disabled="@Busy" @onclick="NewModel">
+                <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                新建模型
+            </button>
+        </h2>
+        @if (models.Count == 0 && modelInput is null)
+        {
+            <div class="empty" style="padding:1.8rem 1.2rem;">
+                <div class="empty-title">该提供商尚未添加模型。</div>
+                <p class="empty-desc">添加模型 ID 并勾选能力标记（思考、工具调用、流式、图片、音频、视频）。能力将决定任务模式下是否可选中。</p>
+            </div>
+        }
+        else if (models.Count > 0)
+        {
+            <div class="card-list">
+                @foreach (var m in models)
+                {
+                    <div class="item" @key="m.Id">
+                        <div class="item-main">
+                            <div class="item-title mono">@m.ModelId</div>
+                            <div class="item-meta">
+                                <span class="tc">上下文 @m.ContextWindow.ToString("N0") tok</span>
+                            </div>
+                            <div class="item-meta">
+                                @foreach (var cap in Caps(m))
+                                {
+                                    <span class="cap">@cap</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="item-actions">
+                            <button type="button" class="btn btn-sm btn-ghost" disabled="@Busy" @onclick="() => Edit(m)">编辑模型</button>
+                            <button type="button" class="icon-btn danger" title="删除模型" aria-label="删除模型" disabled="@Busy" @onclick="() => Delete(m)">
+                                <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        @if (modelInput is not null)
+        {
+            <div style="margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--line);">
+                <h3 style="margin-bottom:0.9rem;">@(modelId is null ? "新建模型" : "编辑模型")</h3>
+                <ModelForm Value="modelInput" Busy="Busy" Save="SaveModel" Cancel="() => modelInput = null" />
+            </div>
+        }
     </section>
 }
 
@@ -64,6 +163,7 @@
     private Guid? providerId, modelId;
 
     protected override Task OnInitializedAsync() => Run(Load);
+
     private async Task Load()
     {
         providers = await Api.Get<List<ProviderDto>>("api/providers");
@@ -77,8 +177,7 @@
     private void Edit(ProviderDto p)
     {
         providerId = p.Id;
-        providerInput = new() { Name = p.Name, Protocol = p.Protocol, BaseUrl = p.BaseUrl,
-            TranscriptionModel = p.TranscriptionModel };
+        providerInput = ProviderInput.From(p);
     }
     private Task Select(ProviderDto p) => Run(async () =>
     {
@@ -102,10 +201,7 @@
     private void Edit(ModelDto m)
     {
         modelId = m.Id;
-        modelInput = new() { ProviderId = m.ProviderId, ModelId = m.ModelId, ContextWindow = m.ContextWindow,
-            SupportsReasoning = m.SupportsReasoning, SupportsToolCalling = m.SupportsToolCalling,
-            SupportsStreaming = m.SupportsStreaming, SupportsImage = m.SupportsImage,
-            SupportsAudio = m.SupportsAudio, SupportsVideo = m.SupportsVideo };
+        modelInput = ModelInput.From(m);
     }
     private Task SaveModel() => Run(async () =>
     {
@@ -120,10 +216,21 @@
         if (modelId == m.Id) modelInput = null;
         await Load();
     });
-    private static string Capabilities(ModelInput m) => string.Join("、", new[]
+    private static string ProtocolName(string protocol) => protocol switch
     {
-        m.SupportsReasoning ? "思考" : null, m.SupportsToolCalling ? "工具" : null,
-        m.SupportsStreaming ? "流式" : null, m.SupportsImage ? "图片" : null,
-        m.SupportsAudio ? "音频" : null, m.SupportsVideo ? "视频" : null
-    }.Where(x => x is not null));
+        "openai-compatible" => "OpenAI 兼容",
+        "gemini-native" => "Gemini 原生",
+        _ => protocol
+    };
+    private static string[] Caps(ModelDto m)
+    {
+        List<string> caps = [];
+        if (m.SupportsReasoning) caps.Add("思考");
+        if (m.SupportsToolCalling) caps.Add("工具调用");
+        if (m.SupportsStreaming) caps.Add("流式");
+        if (m.SupportsImage) caps.Add("图片");
+        if (m.SupportsAudio) caps.Add("音频");
+        if (m.SupportsVideo) caps.Add("视频");
+        return [.. caps];
+    }
 }

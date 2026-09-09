@@ -1,28 +1,21 @@
 ﻿@page "/Error"
 @using System.Diagnostics
 
-<PageTitle>Error</PageTitle>
+<PageTitle>错误 · VideoNote</PageTitle>
 
-<h1 class="text-danger">Error.</h1>
-<h2 class="text-danger">An error occurred while processing your request.</h2>
-
-@if (ShowRequestId)
-{
-    <p>
-        <strong>Request ID:</strong> <code>@RequestId</code>
-    </p>
-}
-
-<h3>Development Mode</h3>
-<p>
-    Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.
-</p>
-<p>
-    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
-    It can result in displaying sensitive information from exceptions to end users.
-    For local debugging, enable the <strong>Development</strong> environment by setting the <strong>ASPNETCORE_ENVIRONMENT</strong> environment variable to <strong>Development</strong>
-    and restarting the app.
-</p>
+<div class="panel" style="max-width:640px;margin:3rem auto;text-align:center;">
+    <div class="empty-ico" style="color:var(--red);background:var(--red-dim);border-color:rgba(226,96,79,0.35);">
+        <svg class="ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    </div>
+    <h1 style="font-size:1.4rem;margin-bottom:0.6rem;">处理请求时发生错误</h1>
+    <p class="dim">请返回重试；若持续出现，请检查服务端日志。</p>
+    @if (ShowRequestId)
+    {
+        <p class="tc" style="margin-top:0.8rem;">Request ID: @RequestId</p>
+    }
+    <h3 style="margin:1.4rem 0 0.5rem;">开发模式</h3>
+    <p class="muted small" style="text-align:left;">切换到 <strong>Development</strong> 环境可显示更详细的异常信息。开发环境不应部署到生产，可能向最终用户泄露敏感信息。本地调试请设置环境变量 <code>ASPNETCORE_ENVIRONMENT=Development</code> 并重启应用。</p>
+</div>
 
 @code{
     [CascadingParameter]

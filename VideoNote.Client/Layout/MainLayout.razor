@@ -1,23 +1,44 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Nav
 
-<div class="page">
-    <div class="sidebar">
+<div class="shell @(_navOpen ? "nav-open" : "")">
+    <aside class="sidebar">
         <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
+    </aside>
+    <div class="scrim" @onclick="CloseNav"></div>
+    <div class="main">
+        <header class="topbar">
+            <button type="button" class="icon-btn" aria-label="切换导航菜单" @onclick="ToggleNav">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
+            <span class="brand-name" style="font-size:0.9rem;">VideoNote</span>
+        </header>
+        <main class="content">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    发生未处理的错误。
+    <a href="." class="reload">重新加载</a>
+    <span class="dismiss">✕</span>
 </div>
+
+@code {
+    private bool _navOpen;
+
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, EventArgs e)
+    {
+        _navOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleNav() => _navOpen = !_navOpen;
+    private void CloseNav() => _navOpen = false;
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

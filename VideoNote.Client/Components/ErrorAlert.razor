@@ -1,0 +1,12 @@
+@if (Message is not null)
+{
+    <div class="alert alert-danger" role="alert">
+        <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        @Message
+    </div>
+}
+
+@code {
+    /// <summary>错误文本；为 null 时不渲染。</summary>
+    [Parameter] public string? Message { get; set; }
+}

@@ -1,7 +1,147 @@
-﻿@page "/"
+@page "/"
+@inherits OperationPage
+@inject ApiClient Api
+@using VideoNote.Shared.Contracts
+@using VideoNote.Shared.Domain
+@using VideoNote.Client.Components
+@using VideoNote.Client.Services
 
-<PageTitle>VideoNote</PageTitle>
+<PageTitle>总览 · VideoNote</PageTitle>
 
-<h1>VideoNote</h1>
+<section class="hero">
+    <div class="beam" aria-hidden="true"></div>
+    <span class="eyebrow">AI VIDEO BRIEFING</span>
+    <h1>把视频放映成一份结构化解读</h1>
+    <p class="lede">上传视频，选择理解模式与提示词，由 AI 生成大纲、重点与摘要。先配置模型，再开始第一个任务。</p>
+    <div class="hero-actions">
+        <NavLink class="btn btn-primary" href="tasks/new">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建解读任务
+        </NavLink>
+        <NavLink class="btn btn-ghost" href="tasks">查看任务列表</NavLink>
+        @if (_providers.Count == 0 && loaded)
+        {
+            <NavLink class="btn btn-ghost" href="settings">先去配置模型 →</NavLink>
+        }
+    </div>
+    <span class="leader"><span class="dot"></span>SCENE 01 · TAKE 01</span>
+</section>
 
-<p>上传视频，生成结构化的 AI 解读报告。</p>
+<ErrorAlert Message="@Error" />
+@if (Error is not null && loaded)
+{
+    <p style="margin:-0.4rem 0 1rem;"><button type="button" class="btn btn-ghost btn-sm" @onclick="() => Run(Load)">重试加载</button></p>
+}
+
+@if (!loaded)
+{
+    <div class="grid cols-4">
+        @foreach (var _ in Enumerable.Range(0, 4))
+        {
+            <div class="skeleton"></div>
+        }
+    </div>
+    <p class="loading-line" style="margin-top:1rem;"><span class="spinner"></span>正在加载工作台…</p>
+}
+else
+{
+    <div class="grid cols-4">
+        <div class="stat"><div class="stat-num">@_tasks.Count</div><div class="stat-label">任务总数</div></div>
+        <div class="stat tone-blue"><div class="stat-num">@runningCount</div><div class="stat-label">进行中 / 排队</div></div>
+        <div class="stat tone-teal"><div class="stat-num">@completedCount</div><div class="stat-label">已完成</div></div>
+        <div class="stat tone-violet"><div class="stat-num">@_models.Count</div><div class="stat-label">可用模型</div></div>
+    </div>
+
+    <section class="panel" style="margin-top:1rem;">
+        <h2 class="panel-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            最近任务
+            <NavLink class="small grow" style="text-align:right;" href="tasks">全部任务 →</NavLink>
+        </h2>
+        @if (_tasks.Count == 0)
+        {
+            <div class="empty">
+                <div class="empty-ico">
+                    <svg class="ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+                </div>
+                <div class="empty-title">还没有任务</div>
+                <p class="empty-desc">上传一段视频，选择理解模式与提示词模板，创建第一个解读任务。</p>
+                <NavLink class="btn btn-primary" href="tasks/new">新建任务</NavLink>
+            </div>
+        }
+        else
+        {
+            <div class="card-list">
+                @foreach (var task in _tasks.Take(5))
+                {
+                    <div class="item" @key="task.Id">
+                        <span class="@Ui.StatusClass(task.Status)"><span class="dot"></span>@Ui.StatusName(task.Status)</span>
+                        <div class="item-main">
+                            <NavLink class="item-title" href="@($"tasks/{task.Id}")">@task.OriginalFileName</NavLink>
+                            <div class="item-meta">
+                                <span class="@Ui.ModeClass(task.Mode)">@Ui.ModeName(task.Mode)</span>
+                                <span class="tc">@Ui.Time(task.CreatedAtUtc)</span>
+                            </div>
+                        </div>
+                        <svg class="ico-sm muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <div class="grid cols-2" style="margin-top:1rem;">
+        <section class="panel">
+            <h2 class="panel-title">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+                模型就绪
+            </h2>
+            @if (_providers.Count == 0)
+            {
+                <p class="dim">尚未配置提供商。添加一个 OpenAI 兼容或 Gemini 原生提供商后即可开始。</p>
+                <NavLink class="btn btn-ghost btn-sm" href="settings">打开模型设置</NavLink>
+            }
+            else
+            {
+                <p class="dim">@_providers.Count 个提供商、@_models.Count 个模型、@_prompts.Count 个提示词模板已就绪。</p>
+                <NavLink class="btn btn-ghost btn-sm" href="settings">管理配置</NavLink>
+            }
+        </section>
+        <section class="panel">
+            <h2 class="panel-title">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                当前版本边界
+            </h2>
+            <p class="dim">分析管线尚未接入：任务创建后仅保存视频与配置选择，不会执行理解。管线接入后，此页将展示实时进度与报告。</p>
+        </section>
+    </div>
+}
+
+@code {
+    private List<TaskDto> _tasks = [];
+    private List<ProviderDto> _providers = [];
+    private List<ModelDto> _models = [];
+    private List<PromptDto> _prompts = [];
+    private bool loaded;
+
+    private int runningCount => _tasks.Count(t => Ui.IsActive(t.Status));
+    private int completedCount => _tasks.Count(t => t.Status == AnalysisTaskStatus.Completed);
+
+    protected override Task OnInitializedAsync() => Run(Load);
+
+    private async Task Load()
+    {
+        try
+        {
+            _tasks = await Api.Get<List<TaskDto>>("api/tasks");
+            _providers = await Api.Get<List<ProviderDto>>("api/providers");
+            _models = await Api.Get<List<ModelDto>>("api/models");
+            _prompts = await Api.Get<List<PromptDto>>("api/prompts");
+        }
+        finally
+        {
+            // 加载失败也要收敛界面：错误提示 + 零值统计，避免骨架永不消失。
+            loaded = true;
+        }
+    }
+}

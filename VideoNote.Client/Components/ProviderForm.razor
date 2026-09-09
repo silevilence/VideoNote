@@ -1,21 +1,49 @@
 @using VideoNote.Shared.Contracts
 
 <EditForm Model="Value" OnValidSubmit="Save" FormName="provider">
-    <DataAnnotationsValidator /><ValidationSummary />
-    <fieldset disabled="@Busy">
-        <div class="mb-3"><label for="provider-name">名称</label><InputText id="provider-name" class="form-control" @bind-Value="Value.Name" /></div>
-        <div class="mb-3"><label for="provider-protocol">协议</label>
-            <InputSelect id="provider-protocol" class="form-select" @bind-Value="Value.Protocol"><option value="openai-compatible">OpenAI 兼容</option><option value="gemini-native">Gemini 原生</option></InputSelect>
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <fieldset disabled="@Busy" style="border:none;padding:0;margin:0;">
+        <div class="grid cols-2">
+            <div class="field">
+                <label for="provider-name">名称</label>
+                <InputText id="provider-name" class="form-control" @bind-Value="Value.Name" placeholder="例如 DeepSeek" />
+            </div>
+            <div class="field">
+                <label for="provider-protocol">协议</label>
+                <InputSelect id="provider-protocol" class="form-select" @bind-Value="Value.Protocol">
+                    <option value="openai-compatible">OpenAI 兼容</option>
+                    <option value="gemini-native">Gemini 原生</option>
+                </InputSelect>
+            </div>
         </div>
-        <div class="mb-3"><label for="provider-url">Base URL</label><InputText id="provider-url" class="form-control" @bind-Value="Value.BaseUrl" /></div>
-        <div class="mb-3"><label for="provider-key">新 API Key</label><InputText id="provider-key" type="password" autocomplete="new-password" class="form-control" @bind-Value="Value.ApiKey" />
-            <small>编辑时留空保留当前密钥；与环境变量名称二选一。</small>
+        <div class="field">
+            <label for="provider-url">Base URL</label>
+            <InputText id="provider-url" class="form-control" @bind-Value="Value.BaseUrl" placeholder="https://api.deepseek.com" />
         </div>
-        <div class="mb-3"><label for="provider-env">密钥环境变量名称</label><InputText id="provider-env" class="form-control" @bind-Value="Value.ApiKeyEnvironmentVariable" /><small>只保存名称，程序调用模型时从服务端环境读取。</small></div>
-        <div class="mb-3"><label><InputCheckbox @bind-Value="Value.ClearApiKey" /> 清除已存密钥或环境变量引用（需清空上面两项）</label></div>
-        <div class="mb-3"><label for="provider-transcription">转写模型（可选）</label><InputText id="provider-transcription" class="form-control" @bind-Value="Value.TranscriptionModel" /></div>
-        <button class="btn btn-primary" type="submit">保存提供商</button>
-        <button class="btn btn-outline-secondary ms-2" type="button" @onclick="Cancel">取消</button>
+        <div class="grid cols-2">
+            <div class="field">
+                <label for="provider-key">新 API Key</label>
+                <InputText id="provider-key" type="password" autocomplete="new-password" class="form-control" @bind-Value="Value.ApiKey" placeholder="编辑时留空表示保留当前密钥" />
+                <p class="hint">与环境变量名称二选一；密钥加密存储，接口不回显。</p>
+            </div>
+            <div class="field">
+                <label for="provider-env">密钥环境变量名称</label>
+                <InputText id="provider-env" class="form-control" @bind-Value="Value.ApiKeyEnvironmentVariable" placeholder="例如 DEEPSEEK_API_KEY" />
+                <p class="hint">只保存名称，调用模型时从服务端环境读取。留空且不填新 Key 表示保留当前密钥来源。</p>
+            </div>
+        </div>
+        <div class="field">
+            <label class="check"><InputCheckbox @bind-Value="Value.ClearApiKey" /> 清除已存密钥或环境变量引用（需先清空上面两项）</label>
+        </div>
+        <div class="field">
+            <label for="provider-transcription">转写模型（可选）</label>
+            <InputText id="provider-transcription" class="form-control" @bind-Value="Value.TranscriptionModel" placeholder="用于无字幕视频的语音转写" />
+        </div>
+        <div class="head-actions">
+            <button class="btn btn-primary" type="submit">保存提供商</button>
+            <button class="btn btn-ghost" type="button" @onclick="Cancel">取消</button>
+        </div>
     </fieldset>
 </EditForm>
 @code {

@@ -1,0 +1,11 @@
+<div class="card-list" aria-busy="true">
+    @for (var i = 0; i < Count; i++)
+    {
+        <div class="skeleton"></div>
+    }
+</div>
+
+@code {
+    /// <summary>骨架条目数量。</summary>
+    [Parameter] public int Count { get; set; } = 3;
+}

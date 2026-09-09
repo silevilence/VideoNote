@@ -1,6 +1,5 @@
 @page "/tasks"
 @inherits OperationPage
-@implements IAsyncDisposable
 @inject ApiClient Api
 @inject IJSRuntime JS
 @using VideoNote.Shared.Contracts
@@ -8,115 +7,113 @@
 @using VideoNote.Client.Components
 @using VideoNote.Client.Services
 
-<PageTitle>视频上传验证 · VideoNote</PageTitle>
-<h1>视频上传验证</h1>
-<p class="alert alert-info">此页验证上传、配置选择、持久化和删除清理。保存后尚不会执行分析。</p>
-@if (Error is not null) { <div class="alert alert-danger" role="alert">@Error</div> }
-@if (uploadError is not null) { <div class="alert alert-danger" role="alert">@uploadError</div> }
-@if (Notice is not null) { <p role="status">@Notice</p> }
-<fieldset disabled="@(Busy || uploading || limits is null)" class="border rounded p-3 mb-4">
-    <legend class="fs-5">保存一个验证任务</legend>
-    <div class="mb-3"><label for="video-file">视频文件</label><input id="video-file" type="file" class="form-control" accept="@string.Join(",", limits?.AllowedExtensions ?? [])" @ref="fileInput" /></div>
-    @if (limits is not null) { <p>上限 @(limits.MaxBytes / 1024 / 1024) MiB；支持 @string.Join("、", limits.AllowedExtensions)</p> }
-    <div class="mb-3"><label for="task-mode">理解模式</label>
-        <select id="task-mode" class="form-select" @bind="mode"><option value="DirectVideo">直接理解</option><option value="SampledFrames">抽帧理解</option><option value="Subtitles">字幕理解</option></select>
+<PageTitle>任务列表 · VideoNote</PageTitle>
+
+<div class="page-head">
+    <div class="titles">
+        <span class="eyebrow">SCREENING LOG</span>
+        <h1>任务列表</h1>
+        <p class="page-sub">所有已创建的解读任务。点击文件名查看详情；分析管线接入后，这里将实时更新进度。</p>
     </div>
-    <div class="mb-3"><label for="task-model">模型（验证上传时可留空）</label>
-        <select id="task-model" class="form-select" @bind="modelId"><option value="">不选择</option>
-            @foreach (var model in models) { <option value="@model.Id">@model.ModelId</option> }
-        </select>
+    <div class="head-actions">
+        <button type="button" class="btn btn-ghost" disabled="@Busy" @onclick="() => Run(Load)">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            刷新
+        </button>
+        <NavLink class="btn btn-primary" href="tasks/new">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建任务
+        </NavLink>
     </div>
-    <div class="mb-3"><label for="task-prompt">提示词模板</label>
-        <select id="task-prompt" class="form-select" @bind="promptId"><option value="">不选择</option>
-            @foreach (var prompt in prompts) { <option value="@prompt.Id">@prompt.Name</option> }
-        </select>
-        @if (prompts.FirstOrDefault(p => p.Id.ToString() == promptId) is { } selectedPrompt)
-        { <pre class="text-wrap border p-2 mt-2">@selectedPrompt.Content</pre> }
-    </div>
-    <button type="button" class="btn btn-primary" @onclick="Upload">上传并保存验证任务</button>
-</fieldset>
-@if (uploading)
+</div>
+
+<ErrorAlert Message="@Error" />
+<NoticeAlert Message="@Notice" />
+
+<div class="filter-bar" role="group" aria-label="按状态筛选">
+    @foreach (var (key, name, match) in Filters)
+    {
+        <button type="button" class="filter-chip @(_filter == key ? "is-active" : "")" disabled="@Busy" @onclick="() => SetFilter(key)">
+            @name<span class="n">@_tasks.Count(match)</span>
+        </button>
+    }
+</div>
+
+@if (Busy && _tasks.Count == 0)
 {
-    <p role="status">@(progress < 100 ? $"上传中 {progress}%" : "上传完成，服务端正在保存…")</p>
-    <progress class="w-100" max="100" value="@progress">@progress%</progress>
-    <button class="btn btn-outline-danger mb-3" @onclick="CancelUpload">取消上传</button>
+    <LoadingCards Count="3" />
 }
-<h2>已保存任务</h2>
-<button class="btn btn-outline-secondary mb-3" disabled="@(Busy || uploading)" @onclick="() => Run(Load)">刷新列表</button>
-@if (Busy) { <p role="status">正在加载…</p> }
-@if (tasks.Count == 0 && !Busy) { <p>暂无任务。</p> }
-<div class="table-responsive"><table class="table"><thead><tr><th>文件</th><th>模式</th><th>说明</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
-@foreach (var task in tasks)
+else if (!visibleTasks.Any())
 {
-    <tr @key="task.Id"><td>@task.OriginalFileName</td><td>@ModeName(task.Mode)</td><td>@task.StageDescription</td><td>@task.CreatedAtUtc.ToLocalTime().ToString("g")</td><td><button class="btn btn-sm btn-outline-danger" disabled="@(Busy || uploading)" @onclick="() => Delete(task)">删除任务及物料</button></td></tr>
+    <div class="empty">
+        <div class="empty-ico">
+            <svg class="ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+        </div>
+        <div class="empty-title">暂无任务。</div>
+        <p class="empty-desc">上传一段视频创建第一个解读任务，或切换上方筛选条件。</p>
+        <NavLink class="btn btn-primary" href="tasks/new">新建任务</NavLink>
+    </div>
 }
-</tbody></table></div>
+else
+{
+    <div class="card-list">
+        @foreach (var task in visibleTasks)
+        {
+            <div class="item" @key="task.Id">
+                <span class="@Ui.StatusClass(task.Status)"><span class="dot"></span>@Ui.StatusName(task.Status)</span>
+                <div class="item-main">
+                    <NavLink class="item-title" href="@($"tasks/{task.Id}")">@task.OriginalFileName</NavLink>
+                    <div class="item-meta">
+                        <span class="@Ui.ModeClass(task.Mode)">@Ui.ModeName(task.Mode)</span>
+                        @if (!string.IsNullOrEmpty(task.StageDescription))
+                        {
+                            <span class="desc">@task.StageDescription</span>
+                        }
+                    </div>
+                </div>
+                <span class="tc nowrap">@Ui.Time(task.CreatedAtUtc)</span>
+                <div class="item-actions">
+                    <button type="button" class="icon-btn danger" title="删除任务及物料" aria-label="删除任务及物料"
+                            disabled="@Busy" @onclick="() => Delete(task)">
+                        <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+}
 
 @code {
-    private List<TaskDto> tasks = [];
-    private List<ModelDto> models = [];
-    private List<PromptDto> prompts = [];
-    private string? promptId;
-    private UploadLimitsDto? limits;
-    private ElementReference fileInput;
-    private IJSObjectReference? module;
-    private DotNetObjectReference<Tasks>? receiver;
-    private string mode = "SampledFrames";
-    private string? modelId;
-    private string? uploadError;
-    private bool uploading;
-    private bool disposed;
-    private int progress;
+    private List<TaskDto> _tasks = [];
+    private string _filter = "all";
+
+    private (string Key, string Name, Func<TaskDto, bool> Match)[] Filters =>
+    [
+        ("all", "全部", _ => true),
+        ("running", "进行中", t => Ui.IsActive(t.Status)),
+        ("completed", "已完成", t => t.Status == AnalysisTaskStatus.Completed),
+        ("failed", "失败", t => t.Status == AnalysisTaskStatus.Failed),
+        ("canceled", "已取消", t => t.Status == AnalysisTaskStatus.Canceled)
+    ];
+
+    private IEnumerable<TaskDto> visibleTasks => _tasks.Where(Filters.First(f => f.Key == _filter).Match);
+
     protected override Task OnInitializedAsync() => Run(Load);
-    private async Task Load()
+
+    private void SetFilter(string key)
     {
-        limits = await Api.Get<UploadLimitsDto>("api/tasks/upload-limits");
-        prompts = await Api.Get<List<PromptDto>>("api/prompts");
-        models = await Api.Get<List<ModelDto>>("api/models");
-        tasks = await Api.Get<List<TaskDto>>("api/tasks");
+        _filter = key;
+        Notice = null;
     }
-    private async Task Upload()
-    {
-        if (uploading || Busy) return;
-        uploading = true; progress = 0; uploadError = null;
-        try
-        {
-            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./upload.js");
-            var file = await module.InvokeAsync<SelectedFile?>("selectedFile", fileInput);
-            if (file is null) { uploadError = "请先选择视频。"; return; }
-            if (file.Size == 0 || file.Size > limits!.MaxBytes) { uploadError = "文件为空或超过上传大小上限。"; return; }
-            if (!limits.AllowedExtensions.Contains(Path.GetExtension(file.Name), StringComparer.OrdinalIgnoreCase)) { uploadError = "视频扩展名不受支持。"; return; }
-            receiver ??= DotNetObjectReference.Create(this);
-            await module.InvokeAsync<TaskDto>("upload", fileInput, new { mode, modelConfigId = modelId, promptTemplateId = promptId }, receiver);
-            await Run(Load);
-            Notice = "视频已保存，当前尚未执行分析。";
-        }
-        catch (JSException ex) { uploadError = ex.Message.Split('\n')[0]; }
-        finally { uploading = false; }
-    }
-    [JSInvokable]
-    public Task UploadProgress(int value)
-    {
-        if (disposed) return Task.CompletedTask;
-        progress = value;
-        return InvokeAsync(StateHasChanged);
-    }
-    private async Task CancelUpload() { if (module is not null) await module.InvokeVoidAsync("cancel", fileInput); }
+
+    private async Task Load() => _tasks = await Api.Get<List<TaskDto>>("api/tasks");
+
     private Task Delete(TaskDto task) => Run(async () =>
     {
         if (!await JS.InvokeAsync<bool>("confirm", $"删除「{task.OriginalFileName}」及视频、帧、音频、字幕和对话记录？")) return;
-        await Api.Delete($"api/tasks/{task.Id}"); await Load();
+        await Api.Delete($"api/tasks/{task.Id}");
+        Notice = $"已删除任务「{task.OriginalFileName}」。";
+        await Load();
     });
-    private static string ModeName(AnalysisMode value) => value switch { AnalysisMode.DirectVideo => "直接理解", AnalysisMode.SampledFrames => "抽帧理解", _ => "字幕理解" };
-    public async ValueTask DisposeAsync()
-    {
-        disposed = true;
-        if (module is not null)
-        {
-            try { await CancelUpload(); await module.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-        }
-        receiver?.Dispose();
-    }
-    private sealed record SelectedFile(string Name, long Size);
+
 }
