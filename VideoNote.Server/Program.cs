@@ -15,6 +15,7 @@ builder.Logging.AddSimpleConsole();
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddControllers();
+builder.Services.AddSingleton<VideoNote.Server.Configuration.ProviderSecrets>();
 builder.Services.AddSignalR();
 
 var storageOptions = builder.Configuration
@@ -75,3 +76,5 @@ await using (var scope = app.Services.CreateAsyncScope())
 }
 
 app.Run();
+
+public partial class Program { }

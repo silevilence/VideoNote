@@ -64,10 +64,13 @@
 
 ## 🚧 开发中 (In Progress)
 
-- [ ] **提供商与模型配置 API**（两级配置的服务端接口）
-    - [ ] 提供商 CRUD：名称、协议类型（openai-compatible / gemini-native）、BaseUrl、ApiKey、可选转写模型
-    - [ ] 模型 CRUD：所属提供商、ModelId、能力标记全字段、上下文窗口
-    - [ ] 模型列表按提供商筛选，能力标记可任意组合编辑
+本轮确认（2026-09-09）：按下列六项顺序开发、审核修复、原地勾选并分别本地提交，最后整体审核。UI 以功能验证与可维护为主。补充最小任务创建/查询/删除 API 和验证页面，不执行尚未实现的分析管线。上传默认上限 1 GiB，扩展名 mp4/mkv/mov/webm/avi/m4v，均可配置；提供可复现视频生成脚本。内置提示词只读，可复制后编辑；自建模板完整 CRUD。密钥加密存储，编辑留空保留、显式清除，并支持运行时读取环境变量。DeepSeek 使用 https://api.deepseek.com、deepseek-v4-flash-vision-exp（OpenAI 兼容、图像能力），程序读取 DEEPSEEK_API_KEY，开发工具不得读取或输出密钥值。Gemini 以协议模拟测试验收，真实端点验证待提供配置后补做。
+
+
+- [x] **提供商与模型配置 API**（两级配置的服务端接口）
+    - [x] 提供商 CRUD：名称、协议类型（openai-compatible / gemini-native）、BaseUrl、ApiKey、可选转写模型
+    - [x] 模型 CRUD：所属提供商、ModelId、能力标记全字段、上下文窗口
+    - [x] 模型列表按提供商筛选，能力标记可任意组合编辑
     - 验收：REST API 增删改查全通，能力标记字段存取无损，ApiKey 不随列表接口明文返回
 
 - [ ] **模型设置管理 UI**（设置页：提供商与模型两级管理界面）
