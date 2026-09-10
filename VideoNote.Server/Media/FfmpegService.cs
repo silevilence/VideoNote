@@ -26,6 +26,11 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
         if (!File.Exists(source)) throw new FileNotFoundException("源视频不存在。", source);
         var json = await runner.RunAsync(settings.FfprobePath,
             ["-v", "error", "-show_format", "-show_streams", "-of", "json", source], ct);
+        return ParseProbe(json);
+    }
+
+    public static MediaInfo ParseProbe(string json)
+    {
         using var doc = JsonDocument.Parse(json);
         var streams = doc.RootElement.GetProperty("streams").EnumerateArray().ToArray();
         if (!doc.RootElement.TryGetProperty("format", out var format) ||
@@ -33,10 +38,12 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
             !double.TryParse(durationElement.GetString(), CultureInfo.InvariantCulture, out var duration) ||
             !double.IsFinite(duration) || duration <= 0)
             throw new InvalidOperationException("无法确定媒体时长。");
-        var subtitle = streams.FirstOrDefault(s => s.GetProperty("codec_type").GetString() == "subtitle");
+        var subtitle = streams.FirstOrDefault(s => s.GetProperty("codec_type").GetString() == "subtitle" &&
+            s.GetProperty("codec_name").GetString() is "subrip" or "ass" or "ssa" or "webvtt" or "mov_text" or "text");
         return new(duration, streams.Any(s => s.GetProperty("codec_type").GetString() == "video"),
             streams.Any(s => s.GetProperty("codec_type").GetString() == "audio"),
-            subtitle.ValueKind == JsonValueKind.Undefined ? null : subtitle.GetProperty("codec_name").GetString());
+            subtitle.ValueKind == JsonValueKind.Undefined ? null : subtitle.GetProperty("codec_name").GetString(),
+            subtitle.ValueKind == JsonValueKind.Undefined ? null : subtitle.GetProperty("index").GetInt32());
     }
 
     public async Task<IReadOnlyList<VideoSegment>> SegmentAsync(string source, Guid taskId, CancellationToken ct = default)
@@ -121,11 +128,9 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
     public async Task<string?> ExtractSubtitlesAsync(string source, Guid taskId, CancellationToken ct = default)
     {
         var info = await ProbeAsync(source, ct);
-        if (info.SubtitleCodec is null) return null;
-        if (info.SubtitleCodec is not ("subrip" or "ass" or "ssa" or "webvtt" or "mov_text" or "text"))
-            throw new InvalidOperationException("内嵌字幕是位图或不支持的格式，无法提取为文本字幕。");
+        if (info.SubtitleStreamIndex is null) return null;
         var output = Path.Combine(Directory.CreateDirectory(Path.Combine(paths.Subtitles, taskId.ToString("N"))).FullName, "subtitles.srt");
-        await EncodeAsync(["-i", source, "-map", "0:s:0", "-c:s", "srt"], output, ct);
+        await EncodeAsync(["-i", source, "-map", $"0:{info.SubtitleStreamIndex}", "-c:s", "srt"], output, ct);
         return output;
     }
 

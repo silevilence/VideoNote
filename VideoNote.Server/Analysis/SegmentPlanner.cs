@@ -15,7 +15,9 @@ public sealed class SegmentPlanner(IFfmpegService media)
         var plan = new List<PlannedSegment>();
         if (task.Mode == AnalysisMode.DirectVideo)
         {
-            var seconds = Math.Max(0.1, (budget.Input - 128.0) / options.VideoTokensPerSecond);
+            var seconds = (budget.Input - 128.0) / options.VideoTokensPerSecond;
+            if (seconds < 0.1)
+                throw new AnalysisException("模型上下文预算不足以容纳最小视频片段，请增大上下文窗口或调整视频预算配置。");
             foreach (var video in prepared.Videos)
                 for (double offset = 0; offset < video.EndSeconds - video.StartSeconds; offset += seconds)
                 {

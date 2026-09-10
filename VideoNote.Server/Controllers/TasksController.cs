@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
 using VideoNote.Server.Analysis;
-using VideoNote.Server.Realtime;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using VideoNote.Server.Data;
@@ -14,7 +12,7 @@ namespace VideoNote.Server.Controllers;
 
 [ApiController, Route("api/tasks")]
 public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files, IOptions<UploadOptions> options,
-    AnalysisQueue queue, IHubContext<AnalysisHub> hub) : ControllerBase
+    AnalysisQueue queue, AnalysisProgressWriter progress) : ControllerBase
 {
     private static TaskDto Dto(AnalysisTask t, bool includeContent = false) => new(t.Id, t.OriginalFileName, t.Mode, t.Status, t.StageDescription, t.CreatedAtUtc, t.ModelConfigId, t.PromptTemplateId, includeContent ? t.PromptContentSnapshot : null,
         t.ProgressPercent, t.ErrorMessage, includeContent ? t.ResultText : null, t.StartedAtUtc, t.CompletedAtUtc, includeContent ? System.Text.Json.JsonSerializer.Deserialize<List<SegmentResultDto>>(t.SegmentResultsJson) : null);
@@ -71,25 +69,8 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
     }
 
     [HttpPost("{id:guid}/cancel")]
-    public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)
-    {
-        await queue.Gate.WaitAsync(ct);
-        try
-        {
-            var task = await db.AnalysisTasks.FindAsync([id], ct);
-            if (task is null) return NotFound();
-            if (AnalysisProgressWriter.Terminal(task.Status)) return NoContent();
-            task.Status = AnalysisTaskStatus.Canceled;
-            task.StageDescription = "已取消";
-            task.CompletedAtUtc = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
-            queue.Cancel(id);
-            await hub.Clients.All.SendAsync("AnalysisProgress",
-                new AnalysisProgress(id, task.Status, task.ProgressPercent, task.StageDescription, null), ct);
-            return NoContent();
-        }
-        finally { queue.Gate.Release(); }
-    }
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken ct) =>
+        await progress.CancelAsync(id, ct) ? NoContent() : NotFound();
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)

@@ -10,6 +10,6 @@ public sealed class FfmpegOptions
     public double FramesPerSecond { get; set; } = 1;
     public int TimeoutSeconds { get; set; } = 900;
 }
-public sealed record MediaInfo(double DurationSeconds, bool HasVideo, bool HasAudio, string? SubtitleCodec);
+public sealed record MediaInfo(double DurationSeconds, bool HasVideo, bool HasAudio, string? SubtitleCodec, int? SubtitleStreamIndex = null);
 public sealed record VideoSegment(string Path, double StartSeconds, double EndSeconds);
 public sealed record VideoFrame(string Path, double TimestampSeconds);

@@ -60,6 +60,7 @@ const assert = require('node:assert/strict');
   await page.getByRole('button',{name:'上传并创建任务'}).click();
   const submitted=await overrideRequest;
   assert.equal(submitted.status(),201);
+  const submittedTask=await submitted.json();
   assert.ok(submitted.url().includes('allowCapabilityOverride=true'));
   await page.waitForURL(/\/tasks\/[0-9a-f-]{36}$/);
   await page.goto(base+'/tasks/new');
@@ -80,6 +81,19 @@ const assert = require('node:assert/strict');
   await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=0);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:'work-tests/browser/pipeline-mobile.png',fullPage:true});
+  console.log('PASS: baseline pipeline and responsive checks');
+  // Blazor reuses the route page: a failed destination must never retain the previous task's actions.
+  const destination=submittedTask.id;
+  const destinationApi=base+'/api/tasks/'+destination;
+  await page.route(destinationApi, route=>route.fulfill({status:503,contentType:'application/json',body:'{"message":"route load failed"}'}));
+  await page.evaluate(id=>{const a=document.createElement('a');a.href='/tasks/'+id;a.id='audit-route-link';a.textContent='switch task';document.body.append(a);},destination);
+  await page.locator('#audit-route-link').click();
+  await page.getByText('route load failed',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('heading',{name:'sample.mkv',exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'删除任务',exact:true}).count(),0);
+  await page.unroute(destinationApi);
+  await page.goto(taskUrl);
+  await page.getByTestId('final-report').filter({hasText:'REPORT_READY complete.'}).waitFor();
   await page.goto(base+'/tasks');
   await page.getByRole('link',{name:'sample.mkv',exact:true}).waitFor();
   const response=await fetch(base+'/api/tasks?fileName=cancel.mkv&mode=SampledFrames&modelConfigId='+model.id,

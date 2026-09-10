@@ -10,6 +10,21 @@ namespace VideoNote.Server.Tests.Analysis;
 public sealed class PlanningTests
 {
     [Fact]
+    public async Task Video_minimum_slice_cannot_exceed_context_budget()
+    {
+        await using var app = new ApiFactory();
+        _ = app.CreateClient();
+        using var scope = app.Services.CreateScope();
+        var options = new PipelineOptions { MaxOutputTokens = 256, VideoTokensPerSecond = 100000 };
+        var budget = new AnalysisBudget(4096, "", options);
+        var prepared = new PreparedMedia(1, [new("must-not-be-opened.mp4", 0, 1)], [], [], []);
+        var planner = scope.ServiceProvider.GetRequiredService<SegmentPlanner>();
+        var error = await Assert.ThrowsAsync<AnalysisException>(() => planner.PlanAsync(
+            new AnalysisTask { Mode = AnalysisMode.DirectVideo }, prepared, budget, options, default));
+        Assert.Contains("预算", error.Message);
+    }
+
+    [Fact]
     public void Text_budget_splits_unicode_without_losing_content_and_packs_within_limit()
     {
         var text = string.Concat(Enumerable.Repeat("中文🙂 evidence\n", 1000));
