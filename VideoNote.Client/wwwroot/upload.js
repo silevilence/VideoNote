@@ -6,6 +6,7 @@ export function upload(input, metadata, receiver) {
     return new Promise((resolve, reject) => {
         const query = new URLSearchParams({fileName: file.name, mode: metadata.mode});
         if (metadata.modelConfigId) query.set("modelConfigId", metadata.modelConfigId);
+        if (metadata.allowCapabilityOverride) query.set("allowCapabilityOverride", "true");
         if (metadata.promptTemplateId) query.set("promptTemplateId", metadata.promptTemplateId);
         const xhr = new XMLHttpRequest();
         active.set(input, xhr);

@@ -63,7 +63,7 @@ public sealed class TaskEdgeTests
         using var content = new PausedContent(gate.Task);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var upload = client.PostAsync($"/api/tasks?fileName=race.mp4&modelConfigId={model.Id}", content, timeout.Token);
+        var upload = client.PostAsync($"/api/tasks?fileName=race.mp4&mode=Subtitles&modelConfigId={model.Id}", content, timeout.Token);
         try
         {
             var videos = app.Services.GetRequiredService<WorkDirectoryPaths>().Videos;

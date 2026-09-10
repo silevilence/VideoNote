@@ -32,8 +32,13 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
     [HttpPost, Consumes("application/octet-stream"), DisableRequestSizeLimit]
     public async Task<ActionResult<TaskDto>> Create([FromQuery] CreateTaskInput input, CancellationToken ct)
     {
-        if (input.ModelConfigId.HasValue && !await db.ModelConfigs.AnyAsync(m => m.Id == input.ModelConfigId, ct))
+        var selectedModel = input.ModelConfigId is { } modelId
+            ? await db.ModelConfigs.AsNoTracking().SingleOrDefaultAsync(m => m.Id == modelId, ct) : null;
+        if (input.ModelConfigId.HasValue && selectedModel is null)
             return BadRequest(new { message = "所选模型不存在。" });
+        if (selectedModel is not null && !input.AllowCapabilityOverride &&
+            !ModelCapabilityRules.Matches(input.Mode, selectedModel.SupportsImage, selectedModel.SupportsVideo))
+            return BadRequest(new { message = $"所选模型未声明{ModelCapabilityRules.RequiredCapability(input.Mode)}能力；请更换模型或显式启用手动覆盖。" });
         if (input.PromptTemplateId.HasValue && !await db.PromptTemplates.AnyAsync(p => p.Id == input.PromptTemplateId, ct))
             return BadRequest(new { message = "所选模板不存在。" });
         var prompt = input.PromptTemplateId.HasValue ? await db.PromptTemplates.FindAsync([input.PromptTemplateId.Value], ct) : null;

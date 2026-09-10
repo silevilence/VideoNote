@@ -105,6 +105,18 @@
                     按「@info.Title」模式已过滤出具备<b>@info.Need</b>能力的模型。
                     <label class="check" style="margin-top:0.35rem;"><InputCheckbox class="check-input" @bind-Value="showAllModels" @bind-Value:after="OnShowAllChanged" /> 显示全部模型（手动覆盖）</label>
                 </p>
+                @if (SelectedModel is { } chosen && !Ui.ModelMatches(chosen, mode))
+                {
+                    <p class="notice" role="status" data-testid="capability-warning">已手动覆盖：所选模型未声明@(Ui.ModeInfo(mode).Need)能力，仍会按当前模式尝试分析，服务不支持时任务会失败。</p>
+                }
+                @if (mode == AnalysisMode.SampledFrames && SelectedModel is { } audioModel)
+                {
+                    <p class="hint">@(audioModel.SupportsAudio ? "该模型具有音频能力：音轨将直接交给模型理解。" : "该模型未声明音频能力：音轨将通过已配置的转写服务转换为文本。")</p>
+                }
+                @if (!showAllModels && !visibleModels.Any())
+                {
+                    <p class="hint">当前模式没有匹配模型；可添加模型或勾选“显示全部模型”主动覆盖。</p>
+                }
             }
         </div>
         <div class="field" style="margin-bottom:0;">
@@ -241,7 +253,8 @@
                 return;
             }
             var created = await module.InvokeAsync<TaskDto>("upload", fileInput,
-                new { mode = mode.ToString(), modelConfigId = modelId, promptTemplateId = promptId }, receiver);
+                new { mode = mode.ToString(), modelConfigId = modelId, promptTemplateId = promptId,
+                    allowCapabilityOverride = showAllModels && SelectedModel is { } chosen && !Ui.ModelMatches(chosen, mode) }, receiver);
             Nav.NavigateTo($"tasks/{created.Id}");
         }
         catch (JSException ex) { uploadError = ex.Message.Split('\n')[0]; }

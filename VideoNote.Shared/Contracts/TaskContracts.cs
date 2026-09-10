@@ -9,6 +9,7 @@ public sealed class CreateTaskInput
     [EnumDataType(typeof(AnalysisMode))] public AnalysisMode Mode { get; set; }
     public Guid? ModelConfigId { get; set; }
     public Guid? PromptTemplateId { get; set; }
+    public bool AllowCapabilityOverride { get; set; }
 }
 public sealed record TaskDto(Guid Id, string OriginalFileName, AnalysisMode Mode, AnalysisTaskStatus Status,
     string? StageDescription, DateTime CreatedAtUtc, Guid? ModelConfigId, Guid? PromptTemplateId, string? PromptContentSnapshot = null, int ProgressPercent = 0, string? ErrorMessage = null,

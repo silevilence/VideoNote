@@ -54,18 +54,18 @@ public static class Ui
     };
 
     /// <summary>模式简介与所需模型能力。</summary>
-    public static (string Title, string Description, string Need, Func<ModelDto, bool> Match) ModeInfo(AnalysisMode mode) =>
+    public static (string Title, string Description, string Need) ModeInfo(AnalysisMode mode) =>
         mode switch
         {
             AnalysisMode.DirectVideo =>
-                ("直接理解", "整段视频交给多模态模型通读，保留完整时空信息，适合短片与关键镜头。", "视频", m => m.SupportsVideo),
+                ("直接理解", "整段视频交给多模态模型通读，保留完整时空信息，适合短片与关键镜头。", "视频"),
             AnalysisMode.SampledFrames =>
-                ("抽帧理解", "按帧率抽帧并提取音频，画面逐组理解后汇总，通用性最好。", "图像", m => m.SupportsImage),
+                ("抽帧理解", "按帧率抽帧并提取音频，画面逐组理解后汇总，通用性最好。", "图像"),
             _ =>
-                ("字幕理解", "以内嵌字幕或转写文本为准，速度最快，token 消耗最低。", "文本", _ => true)
+                ("字幕理解", "以内嵌字幕或转写文本为准，速度最快，token 消耗最低。", "文本")
         };
 
-    public static bool ModelMatches(ModelDto model, AnalysisMode mode) => ModeInfo(mode).Match(model);
+    public static bool ModelMatches(ModelDto model, AnalysisMode mode) => ModelCapabilityRules.Matches(mode, model.SupportsImage, model.SupportsVideo);
 
     public static string Size(long bytes) => bytes switch
     {
