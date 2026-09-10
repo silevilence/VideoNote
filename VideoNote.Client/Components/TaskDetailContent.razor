@@ -9,17 +9,19 @@
 @using VideoNote.Client.Services
 
 <PageTitle>任务详情 · VideoNote</PageTitle>
-<AnalysisWatch TaskId="Id" Refresh="() => Run(RefreshTask)" TextReceived="ReceiveText" />
+<AnalysisWatch TaskId="Id" Refresh="() => Refresh(RefreshTask)" TextReceived="ReceiveText" />
 
 @if (Busy && _task is null)
 {
     <p class="loading-line"><span class="spinner"></span>正在加载任务…</p>
 }
-else if (_task is null && Error is not null)
+else if (_task is null && (Error ?? RefreshError) is not null)
 {
     <ErrorAlert Message="@Error" />
+    <ErrorAlert Message="@RefreshError" />
+    <ErrorAlert Message="@_metadataError" />
     <p class="loading-line">
-        <button type="button" class="btn btn-ghost btn-sm" @onclick="() => Run(Load)">重试加载</button>
+        <button type="button" class="btn btn-ghost btn-sm" @onclick="() => Refresh(RefreshTask)">重试加载</button>
         <NavLink class="btn btn-ghost btn-sm" href="tasks">返回任务列表</NavLink>
     </p>
 }
@@ -62,6 +64,8 @@ else
     </div>
 
     <ErrorAlert Message="@Error" />
+    <ErrorAlert Message="@RefreshError" />
+    <ErrorAlert Message="@_metadataError" />
 
     <section class="panel">
         <h2 class="panel-title">
@@ -71,8 +75,8 @@ else
         <div class="kv-grid">
             <div><div class="kv-key">状态</div><div class="kv-val"><span class="@Ui.StatusClass(_task.Status)"><span class="dot"></span>@Ui.StatusName(_task.Status)</span></div></div>
             <div><div class="kv-key">理解模式</div><div class="kv-val">@Ui.ModeName(_task.Mode)</div></div>
-            <div><div class="kv-key">分析模型</div><div class="kv-val">@(ModelName ?? "未指定")</div></div>
-            <div><div class="kv-key">提示词模板</div><div class="kv-val">@(PromptName ?? "未使用")</div></div>
+            <div><div class="kv-key">分析模型</div><div class="kv-val">@(_task.ModelConfigId is null ? "未指定" : !_modelsLoaded ? "暂不可用" : ModelName ?? "模型已删除")</div></div>
+            <div><div class="kv-key">提示词模板</div><div class="kv-val">@(_task.PromptTemplateId is null ? "未使用" : !_promptsLoaded ? "暂不可用" : PromptName ?? "模板已删除")</div></div>
             <div><div class="kv-key">创建时间</div><div class="kv-val mono">@Ui.Time(_task.CreatedAtUtc)</div></div>
             <div><div class="kv-key">任务 ID</div><div class="kv-val mono small">@_task.Id</div></div>
         </div>
@@ -142,13 +146,15 @@ else
     private string _report = "";
     private readonly Dictionary<int, string> _live = [];
     private bool _disposed;
+    private bool _modelsLoaded, _promptsLoaded;
+    private string? _metadataError;
     private List<ModelDto> _models = [];
     private List<PromptDto> _prompts = [];
 
     private string? ModelName => _models.FirstOrDefault(m => m.Id == _task?.ModelConfigId)?.ModelId;
     private string? PromptName => _prompts.FirstOrDefault(p => p.Id == _task?.PromptTemplateId)?.Name;
 
-    protected override Task OnInitializedAsync() => Run(Load);
+    protected override Task OnInitializedAsync() => Refresh(RefreshTask);
     private void ReceiveText(AnalysisText update)
     {
         if (_disposed || update.TaskId != Id) return;
@@ -157,16 +163,22 @@ else
         if (update.Stage == "report") _report += update.Text;
     }
 
-    private async Task Load()
+    private async Task RefreshTask()
     {
         _task = await Api.Get<TaskDto>($"api/tasks/{Id}");
-        _models = await Api.Get<List<ModelDto>>("api/models");
-        _prompts = await Api.Get<List<PromptDto>>("api/prompts");
+        if (_disposed) return;
+        try
+        {
+            if (!_modelsLoaded) { _models = await Api.Get<List<ModelDto>>("api/models"); _modelsLoaded = true; }
+            if (!_promptsLoaded) { _prompts = await Api.Get<List<PromptDto>>("api/prompts"); _promptsLoaded = true; }
+            _metadataError = null;
+        }
+        catch (Exception ex) when (ex is TaskCanceledException or HttpRequestException or InvalidOperationException)
+        { _metadataError = "模型或模板信息暂时加载失败，正在自动重试。"; }
     }
 
     public void Dispose() => _disposed = true;
 
-    private async Task RefreshTask() => _task = await Api.Get<TaskDto>($"api/tasks/{Id}");
     private Task Cancel() => Run(async () =>
     {
         if (_disposed) return;

@@ -24,7 +24,8 @@ public sealed class SegmentPlanner(IFfmpegService media)
                     var length = Math.Min(seconds, video.EndSeconds - video.StartSeconds - offset);
                     var path = offset == 0 && length >= video.EndSeconds - video.StartSeconds ? video.Path :
                         await media.ExtractVideoRangeAsync(video.Path, task.Id, offset, offset + length, ct);
-                    plan.Add(new(video.StartSeconds + offset, video.StartSeconds + offset + length, "", [], path));
+                    if (path is not null)
+                        plan.Add(new(video.StartSeconds + offset, video.StartSeconds + offset + length, "", [], path));
                 }
         }
         else if (task.Mode == AnalysisMode.SampledFrames)
@@ -52,7 +53,8 @@ public sealed class SegmentPlanner(IFfmpegService media)
                     var length = Math.Min(seconds, audio.EndSeconds - audio.StartSeconds - offset);
                     var path = offset == 0 && length >= audio.EndSeconds - audio.StartSeconds ? audio.Path :
                         await media.ExtractAudioRangeAsync(audio.Path, task.Id, offset, offset + length, ct);
-                    plan.Add(new(audio.StartSeconds + offset, audio.StartSeconds + offset + length, "", [], AudioPath: path));
+                    if (path is not null)
+                        plan.Add(new(audio.StartSeconds + offset, audio.StartSeconds + offset + length, "", [], AudioPath: path));
                 }
             }
         }

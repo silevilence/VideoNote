@@ -8,7 +8,7 @@
 @using VideoNote.Client.Services
 
 <PageTitle>任务列表 · VideoNote</PageTitle>
-<AnalysisWatch Refresh="() => Run(Load)" />
+<AnalysisWatch Refresh="() => Refresh(Load)" />
 
 <div class="page-head">
     <div class="titles">
@@ -29,6 +29,7 @@
 </div>
 
 <ErrorAlert Message="@Error" />
+<ErrorAlert Message="@RefreshError" />
 <NoticeAlert Message="@Notice" />
 
 <div class="filter-bar" role="group" aria-label="按状态筛选">
@@ -99,7 +100,7 @@ else
 
     private IEnumerable<TaskDto> visibleTasks => _tasks.Where(Filters.First(f => f.Key == _filter).Match);
 
-    protected override Task OnInitializedAsync() => Run(Load);
+    protected override Task OnInitializedAsync() => Refresh(Load);
 
     private void SetFilter(string key)
     {

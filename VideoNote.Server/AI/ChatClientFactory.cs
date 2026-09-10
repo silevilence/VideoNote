@@ -50,9 +50,9 @@ public sealed class ChatClientFactory(VideoNoteDbContext db, ProviderSecrets sec
             {
                 BaseUrl = endpoint.GetLeftPart(UriPartial.Authority) + path[..^(last.Length + 1)],
                 ApiVersion = last,
-                Timeout = 120000
+                Timeout = Timeout.Infinite
             }
-            : new HttpOptions { BaseUrl = endpoint.ToString().TrimEnd('/'), ApiVersion = "v1beta", Timeout = 120000 };
+            : new HttpOptions { BaseUrl = endpoint.ToString().TrimEnd('/'), ApiVersion = "v1beta", Timeout = Timeout.Infinite };
     }
 
     private sealed class VideoInputGuard(IChatClient inner, ProviderProtocol protocol) : DelegatingChatClient(inner)

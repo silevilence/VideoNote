@@ -65,6 +65,69 @@ public sealed class PipelineFailureTests
         Assert.Contains("PIPELINE_OK", result.ResultText);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, true)]
+    public async Task Content_filter_never_persists_partial_output_as_a_complete_result(bool gemini, bool streaming, bool report)
+    {
+        await using var endpoint = await ProtocolEndpoint.Start();
+        endpoint.Filtered = true; endpoint.FilterReport = report;
+        await using var original = new ApiFactory(runWorker: true);
+        await using var app = original.WithWebHostBuilder(b => b.ConfigureServices(s =>
+        {
+            s.RemoveAll<IMediaPreprocessor>(); s.AddSingleton<IMediaPreprocessor>(new PreparedStub());
+        }));
+        using var http = app.CreateClient();
+        var modelId = await PipelineProtocolTests.Seed(app.Services, endpoint.Url, gemini);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<VideoNoteDbContext>();
+            (await db.ModelConfigs.FindAsync(modelId))!.SupportsStreaming = streaming;
+            await db.SaveChangesAsync();
+        }
+        var task = await Upload(http, modelId, AnalysisMode.Subtitles);
+        var result = await PipelineProtocolTests.WaitTerminal(http, task.Id);
+        Assert.Equal(AnalysisTaskStatus.Failed, result.Status);
+        Assert.Contains("过滤", result.ErrorMessage);
+        Assert.Null(result.ResultText);
+        Assert.Equal(report ? 1 : 0, result.Segments!.Count);
+        Assert.Equal(report ? 2 : 1, endpoint.ChatCalls);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Configured_timeout_stops_gemini_pipeline_with_an_actionable_error(bool streaming)
+    {
+        await using var endpoint = await ProtocolEndpoint.Start();
+        endpoint.FirstChatDelayMilliseconds = 10000;
+        await using var original = new ApiFactory(new() { ["Pipeline:RequestTimeoutSeconds"] = "2" }, runWorker: true);
+        await using var app = original.WithWebHostBuilder(b => b.ConfigureServices(s =>
+        {
+            s.RemoveAll<IMediaPreprocessor>(); s.AddSingleton<IMediaPreprocessor>(new PreparedStub());
+        }));
+        using var http = app.CreateClient();
+        var modelId = await PipelineProtocolTests.Seed(app.Services, endpoint.Url, true);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<VideoNoteDbContext>();
+            (await db.ModelConfigs.FindAsync(modelId))!.SupportsStreaming = streaming;
+            await db.SaveChangesAsync();
+        }
+        var task = await Upload(http, modelId, AnalysisMode.Subtitles);
+        var result = await PipelineProtocolTests.WaitTerminal(http, task.Id);
+        Assert.Equal(AnalysisTaskStatus.Failed, result.Status);
+        Assert.Contains("超时", result.ErrorMessage);
+        Assert.Null(result.ResultText);
+        Assert.Equal(1, endpoint.ChatCalls);
+    }
+
     private static async Task<TaskDto> Upload(HttpClient http, Guid model, AnalysisMode mode)
     {
         using var content = new ByteArrayContent([1, 2, 3]);

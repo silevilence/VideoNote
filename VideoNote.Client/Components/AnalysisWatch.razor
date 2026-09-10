@@ -1,12 +1,14 @@
 @implements IAsyncDisposable
 @inject NavigationManager Navigation
+@inject ILogger<AnalysisWatch> Logger
 @using Microsoft.AspNetCore.SignalR.Client
 @using VideoNote.Shared.Contracts
+@using VideoNote.Client.Services
 @using System.Threading
 
-@if (_offline)
+@if (_offline || _refreshFailed)
 {
-    <p class="hint" role="status">实时连接暂不可用，正在自动刷新并重连。</p>
+    <p class="hint" role="status">@(_refreshFailed ? "自动刷新暂时失败，正在重试。" : "实时连接暂不可用，正在自动刷新并重连。")</p>
 }
 
 @code {
@@ -17,11 +19,11 @@
     private readonly CancellationTokenSource _stop = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private Task? _poll;
-    private bool _offline;
+    private bool _offline, _refreshFailed;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
+        if (!firstRender) return Task.CompletedTask;
         _hub = new HubConnectionBuilder().WithUrl(Navigation.ToAbsoluteUri("hubs/analysis"))
             .WithAutomaticReconnect().Build();
         _hub.On<AnalysisProgress>("AnalysisProgress", p =>
@@ -30,40 +32,49 @@
             TaskId == t.TaskId && !_stop.IsCancellationRequested
                 ? InvokeAsync(() => TextReceived.InvokeAsync(t)) : Task.CompletedTask);
         _hub.Reconnected += _ => Reload();
-        _poll = Poll();
-        await Task.CompletedTask;
+        _poll = RefreshLoop.RunAsync(PollOnce, RefreshFailed, TimeSpan.FromSeconds(5), _stop.Token);
+        return Task.CompletedTask;
+    }
+    private void RefreshFailed(Exception ex)
+    {
+        _refreshFailed = true;
+        Logger.LogWarning("自动刷新失败（{Type}），将在下一轮重试。", ex.GetType().Name);
     }
     private async Task Reload()
     {
         if (_stop.IsCancellationRequested) return;
         if (!await _refreshGate.WaitAsync(0)) return;
-        try { if (!_stop.IsCancellationRequested) await InvokeAsync(() => Refresh.InvokeAsync()); }
-        finally { _refreshGate.Release(); }
-    }
-    private async Task Poll()
-    {
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
-            do
+            if (!_stop.IsCancellationRequested)
             {
-                if (_hub!.State == HubConnectionState.Disconnected)
-                {
-                    try { await _hub.StartAsync(_stop.Token); }
-                    catch (Exception) when (!_stop.IsCancellationRequested) { }
-                }
-                _offline = _hub.State != HubConnectionState.Connected;
-                await Reload();
-                await InvokeAsync(StateHasChanged);
-            } while (await timer.WaitForNextTickAsync(_stop.Token));
+                await InvokeAsync(() => Refresh.InvokeAsync());
+                _refreshFailed = false;
+            }
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+        catch (Exception ex) { if (!_stop.IsCancellationRequested) RefreshFailed(ex); }
+        finally { _refreshGate.Release(); }
+    }
+    private async Task PollOnce()
+    {
+        if (_hub!.State == HubConnectionState.Disconnected)
+        {
+            try { await _hub.StartAsync(_stop.Token); }
+            catch (Exception) when (!_stop.IsCancellationRequested) { }
+        }
+        _offline = _hub.State != HubConnectionState.Connected;
+        await Reload();
+        if (!_stop.IsCancellationRequested) await InvokeAsync(StateHasChanged);
     }
     public async ValueTask DisposeAsync()
     {
         await _stop.CancelAsync();
-        if (_poll is not null) await _poll;
-        if (_hub is not null) await _hub.DisposeAsync();
-        _stop.Dispose();
+        try { if (_poll is not null) await _poll; }
+        finally
+        {
+            if (_hub is not null) await _hub.DisposeAsync();
+            _stop.Dispose();
+        }
     }
 }

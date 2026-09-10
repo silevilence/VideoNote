@@ -99,7 +99,9 @@ public sealed class ProtocolEndpoint : IAsyncDisposable
     public string Url => app.Urls.Single();
     public int ChatCalls, Uploads, Deletes, Transcriptions;
     public readonly ConcurrentQueue<string> Bodies = new();
-    public bool FailFiles, FailChat, EmptyChat, Truncate, LongMaps;
+    public bool FailFiles, FailChat, EmptyChat, Truncate, LongMaps, Filtered, FilterReport;
+    public int FirstChatDelayMilliseconds;
+    public TaskCompletionSource ChatStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ProtocolEndpoint(WebApplication app)
     {
         this.app = app;
@@ -139,19 +141,26 @@ public sealed class ProtocolEndpoint : IAsyncDisposable
             var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
             Bodies.Enqueue(body);
             Interlocked.Increment(ref ChatCalls);
+            ChatStarted.TrySetResult();
             if (FailChat) { ctx.Response.StatusCode = 400; await ctx.Response.WriteAsync("secret upstream"); return; }
             var google = path.Contains("GenerateContent") || path.Contains("generateContent");
             var streaming = path.Contains("streamGenerateContent") || body.Contains("\"stream\":true");
             var decoded = System.Text.RegularExpressions.Regex.Unescape(body);
             var value = EmptyChat ? "" : LongMaps && !decoded.Contains("压缩这些") && !decoded.Contains("依据全部")
                 ? string.Concat(Enumerable.Repeat("MAP", 600)) : "PIPELINE_OK";
-            var finish = Truncate ? "length" : "stop";
+            var filtered = Filtered && (!FilterReport || decoded.Contains("依据全部"));
+            var finish = filtered ? "content_filter" : Truncate ? "length" : "stop";
             ctx.Response.ContentType = streaming ? "text/event-stream" : "application/json";
             var json = google
-                ? JsonSerializer.Serialize(new { candidates = new[] { new { content = new { role = "model", parts = new[] { new { text = value } } }, finishReason = Truncate ? "MAX_TOKENS" : "STOP" } }, modelVersion = "test" })
+                ? JsonSerializer.Serialize(new { candidates = new[] { new { content = new { role = "model", parts = new[] { new { text = value } } }, finishReason = filtered ? "SAFETY" : Truncate ? "MAX_TOKENS" : "STOP" } }, modelVersion = "test" })
                 : streaming
                     ? JsonSerializer.Serialize(new { id = "test", @object = "chat.completion.chunk", created = 1, model = "test", choices = new[] { new { index = 0, delta = new { role = "assistant", content = value }, finish_reason = finish } } })
                     : JsonSerializer.Serialize(new { id = "test", @object = "chat.completion", created = 1, model = "test", choices = new[] { new { index = 0, message = new { role = "assistant", content = value }, finish_reason = finish } } });
+            if (ChatCalls == 1 && FirstChatDelayMilliseconds > 0)
+            {
+                await ctx.Response.StartAsync();
+                await Task.Delay(FirstChatDelayMilliseconds, ctx.RequestAborted);
+            }
             await ctx.Response.WriteAsync(streaming ? "data: " + json + "\n\n" + (google ? "" : "data: [DONE]\n\n") : json);
         });
     }

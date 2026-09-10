@@ -11,8 +11,8 @@ public interface IFfmpegService
     Task<IReadOnlyList<VideoSegment>> SegmentAsync(string source, Guid taskId, CancellationToken ct = default);
     Task<IReadOnlyList<VideoFrame>> ExtractFramesAsync(string source, Guid taskId, CancellationToken ct = default);
     Task<string> ExtractAudioAsync(string source, Guid taskId, string format = "wav", CancellationToken ct = default);
-    Task<string> ExtractVideoRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default);
-    Task<string> ExtractAudioRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default);
+    Task<string?> ExtractVideoRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default);
+    Task<string?> ExtractAudioRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default);
     Task<string?> ExtractSubtitlesAsync(string source, Guid taskId, CancellationToken ct = default);
 }
 
@@ -56,10 +56,10 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
         {
             var end = Math.Min(start + settings.SegmentSeconds, info.DurationSeconds);
             var output = Path.Combine(directory, $"segment_{segments.Count:D5}.mp4");
-            await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
+            if (await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
                 "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-c:v", "libx264", "-preset", "veryfast",
-                "-c:a", "aac", "-movflags", "+faststart"], output, ct);
-            segments.Add(new(output, start, end));
+                "-c:a", "aac", "-movflags", "+faststart"], output, ct, "v:0"))
+                segments.Add(new(output, start, end));
             if (end >= info.DurationSeconds) break;
         }
         return segments;
@@ -103,26 +103,26 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
         return output;
     }
 
-    public async Task<string> ExtractVideoRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default)
+    public async Task<string?> ExtractVideoRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default)
     {
         if (!double.IsFinite(start) || !double.IsFinite(end) || start < 0 || end <= start)
             throw new ArgumentException("视频分段范围无效。");
         var directory = Directory.CreateDirectory(Path.Combine(paths.Videos, taskId.ToString("N"), "context-segments")).FullName;
         var output = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".mp4");
-        await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
-            "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac"], output, ct);
-        return output;
+        var hasVideo = await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
+            "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac"], output, ct, "v:0");
+        return hasVideo ? output : null;
     }
 
-    public async Task<string> ExtractAudioRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default)
+    public async Task<string?> ExtractAudioRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default)
     {
         if (!double.IsFinite(start) || !double.IsFinite(end) || start < 0 || end <= start)
             throw new ArgumentException("音频分段范围无效。");
         var directory = Directory.CreateDirectory(Path.Combine(paths.Audio, taskId.ToString("N"))).FullName;
         var output = Path.Combine(directory, $"audio_{(long)(start * 1000):D12}_{(long)(end * 1000):D12}_{Guid.NewGuid():N}.mp3");
-        await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
-            "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame"], output, ct);
-        return output;
+        var hasAudio = await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
+            "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame"], output, ct, "a:0");
+        return hasAudio ? output : null;
     }
 
     public async Task<string?> ExtractSubtitlesAsync(string source, Guid taskId, CancellationToken ct = default)
@@ -134,16 +134,22 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
         return output;
     }
 
-    private async Task EncodeAsync(IEnumerable<string> arguments, string output, CancellationToken ct)
+    private async Task<bool> EncodeAsync(IEnumerable<string> arguments, string output, CancellationToken ct, string? requiredStream = null)
     {
         // Keep a previous successful artifact intact until the replacement is complete.
         var temporary = Path.Combine(Path.GetDirectoryName(output)!,
             Guid.NewGuid().ToString("N") + ".partial" + Path.GetExtension(output));
         try
         {
-            await runner.RunAsync(settings.FfmpegPath,
-                new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-y" }.Concat(arguments).Append(temporary), ct);
+            // Packet statistics distinguish an empty stream from a nonempty container header.
+            var stats = requiredStream is null ? Array.Empty<string>() :
+                new[] { "-stats_mux_pre:" + requiredStream, "pipe:1", "-stats_mux_pre_fmt:" + requiredStream, "{n}" };
+            var packets = await runner.RunAsync(settings.FfmpegPath,
+                new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-y" }
+                    .Concat(arguments).Concat(stats).Append(temporary), ct);
+            if (requiredStream is not null && string.IsNullOrWhiteSpace(packets)) return false;
             File.Move(temporary, output, overwrite: true);
+            return true;
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }

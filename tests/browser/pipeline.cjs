@@ -77,6 +77,33 @@ const assert = require('node:assert/strict');
   await page.getByTestId('final-report').filter({hasText:'REPORT_READY complete.'}).waitFor();
   await page.locator('details').filter({hasText:'STREAM_BEGIN complete.'}).waitFor();
   await page.screenshot({path:'work-tests/browser/pipeline-complete.png',fullPage:true});
+  let modelsAvailable=false, promptsAvailable=false;
+  await page.route(base+'/api/models', r=>modelsAvailable ? r.continue() :
+    r.fulfill({status:503,contentType:'application/json',body:'{"message":"metadata unavailable"}'}));
+  await page.route(base+'/api/prompts', r=>promptsAvailable ? r.continue() :
+    r.fulfill({status:503,contentType:'application/json',body:'{"message":"metadata unavailable"}'}));
+  await page.reload();
+  const metadataError=page.getByText('模型或模板信息暂时加载失败，正在自动重试。',{exact:true});
+  await metadataError.waitFor();
+  await page.locator('.kv-grid > div').filter({hasText:'分析模型'}).getByText('暂不可用',{exact:true}).waitFor();
+  await page.waitForResponse(r=>r.url()===base+'/api/models'&&r.status()===503);
+  assert.ok(await metadataError.isVisible());
+  modelsAvailable=true;
+  await page.locator('.kv-grid > div').filter({hasText:'分析模型'}).getByText('test-model',{exact:true}).waitFor();
+  assert.ok(await metadataError.isVisible());
+  promptsAvailable=true;
+  await metadataError.waitFor({state:'hidden'});
+  await page.unroute(base+'/api/models'); await page.unroute(base+'/api/prompts');
+  const currentTaskApi=base+'/api/tasks/'+taskUrl.split('/').pop();
+  await page.route(currentTaskApi,r=>r.request().method()==='DELETE' ?
+    r.fulfill({status:409,contentType:'application/json',body:'{"message":"audit-delete-conflict"}'}) : r.continue());
+  await page.getByRole('button',{name:'删除任务',exact:true}).click();
+  await page.getByText('audit-delete-conflict',{exact:true}).waitFor();
+  await page.waitForResponse(r=>r.url()===currentTaskApi&&r.request().method()==='GET');
+  await page.waitForResponse(r=>r.url()===currentTaskApi&&r.request().method()==='GET');
+  assert.ok(await page.getByText('audit-delete-conflict',{exact:true}).isVisible());
+  await page.unroute(currentTaskApi);
+  console.log('PASS: metadata retries recover and polling preserves action errors');
   await page.setViewportSize({width:390,height:844});
   await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=0);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -103,6 +130,13 @@ const assert = require('node:assert/strict');
   await page.getByRole('button',{name:'取消分析',exact:true}).click();
   await page.getByRole('button',{name:'取消分析',exact:true}).waitFor({state:'hidden'});
   assert.equal((await (await fetch(base+'/api/tasks/'+canceled.id)).json()).status,6);
+  await page.goto(base+'/tasks');
+  await page.locator('.item').filter({hasText:'override.mkv'}).getByRole('button',{name:'删除任务及物料',exact:true}).click();
+  const deleteNotice=page.getByText('已删除任务「override.mkv」。',{exact:true});
+  await deleteNotice.waitFor();
+  await page.waitForResponse(r=>r.url()===base+'/api/tasks'&&r.request().method()==='GET');
+  await page.waitForResponse(r=>r.url()===base+'/api/tasks'&&r.request().method()==='GET');
+  assert.ok(await deleteNotice.isVisible());
   assert.deepEqual(errors,[]);
   console.log('PASS: browser upload -> live map text -> final report -> reload persistence; list updates and cancellation; desktop/mobile screenshots');
  } finally {

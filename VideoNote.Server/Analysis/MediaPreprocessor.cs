@@ -85,6 +85,7 @@ public sealed class MediaPreprocessor(IFfmpegService media, ITranscriptionServic
                     await Stage(12 + (int)(12.0 * index / count),
                         direct ? $"提取音频分段 {index + 1}/{count}（音频直传）" : $"转写音频分段 {index + 1}/{count}");
                     var path = await media.ExtractAudioRangeAsync(source, task.Id, start, end, ct);
+                    if (path is null) continue;
                     if (direct) audio.Add(new(path, start, end));
                     else
                     {
