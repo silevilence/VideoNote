@@ -29,6 +29,10 @@ builder.Services.AddOptions<UploadOptions>()
         o.AllowedExtensions.All(e => !string.IsNullOrWhiteSpace(e) && e.StartsWith('.') && e.Length > 1 &&
             e.Skip(1).All(char.IsAsciiLetterOrDigit)), "上传大小或扩展名配置无效。").ValidateOnStart();
 builder.Services.AddSingleton<VideoFileStore>();
+builder.Services.AddOptions<VideoNote.Server.Transcription.TranscriptionOptions>().BindConfiguration("Transcription")
+    .Validate(o => o.TimeoutSeconds > 0 && o.MaxAudioBytes > 0, "转写超时和大小上限必须大于零。").ValidateOnStart();
+builder.Services.AddHttpClient<VideoNote.Server.Transcription.IAudioTranscriptionBackend, VideoNote.Server.Transcription.OpenAiTranscriptionBackend>(c => c.Timeout = Timeout.InfiniteTimeSpan);
+builder.Services.AddScoped<VideoNote.Server.Transcription.ITranscriptionService, VideoNote.Server.Transcription.TranscriptionService>();
 builder.Services.AddOptions<VideoNote.Server.Media.FfmpegOptions>()
     .BindConfiguration("Ffmpeg")
     .Validate(o => double.IsFinite(o.SegmentSeconds) && o.SegmentSeconds > 0 &&
