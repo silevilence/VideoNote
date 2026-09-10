@@ -22,8 +22,14 @@ builder.Services.AddOptions<VideoNote.Server.Analysis.AnalysisOptions>().BindCon
 builder.Services.AddScoped<VideoNote.Server.Analysis.IMediaPreprocessor, VideoNote.Server.Analysis.MediaPreprocessor>();
 builder.Services.AddSingleton<VideoNote.Server.Analysis.AnalysisQueue>();
 builder.Services.AddSingleton<VideoNote.Server.Analysis.AnalysisProgressWriter>();
-builder.Services.AddScoped<VideoNote.Server.Analysis.IAnalysisPipeline, VideoNote.Server.Analysis.PendingAnalysisPipeline>();
+builder.Services.AddScoped<VideoNote.Server.Analysis.IAnalysisPipeline, VideoNote.Server.Analysis.AnalysisPipeline>();
 builder.Services.AddHostedService<VideoNote.Server.Analysis.AnalysisWorker>();
+builder.Services.AddOptions<VideoNote.Server.Analysis.PipelineOptions>().BindConfiguration("Pipeline")
+    .Validate(o => o.MaxOutputTokens >= 128 && o.MaxImagesPerSegment > 0 && o.ImageTokenEstimate > 0 &&
+        o.AudioTokensPerSecond > 0 && o.VideoTokensPerSecond > 0 && o.RequestTimeoutSeconds > 0, "理解管线预算与超时配置无效。").ValidateOnStart();
+builder.Services.AddScoped<VideoNote.Server.Analysis.SegmentPlanner>();
+builder.Services.AddHttpClient<VideoNote.Server.AI.IGeminiFileService, VideoNote.Server.AI.GeminiFileService>(
+    c => c.Timeout = Timeout.InfiniteTimeSpan).RemoveAllLoggers();
 builder.Services.AddOptions<UploadOptions>()
     .Configure<IConfiguration>((options, config) => options.Bind(config.GetSection("Upload")))
     .Validate(o => o.MaxBytes > 0 && o.AllowedExtensions is { Length: > 0 } &&

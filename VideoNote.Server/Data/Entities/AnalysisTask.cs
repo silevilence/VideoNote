@@ -22,6 +22,8 @@ public sealed class AnalysisTask
 
     public string? ResultText { get; set; }
 
+    public string SegmentResultsJson { get; set; } = "[]";
+
     public string? ErrorMessage { get; set; }
 
     public Guid? ModelConfigId { get; set; }

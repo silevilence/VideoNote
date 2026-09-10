@@ -7,11 +7,6 @@ public interface IAnalysisPipeline
 {
     Task<string> RunAsync(Guid taskId, CancellationToken ct);
 }
-public sealed class PendingAnalysisPipeline : IAnalysisPipeline
-{
-    public Task<string> RunAsync(Guid taskId, CancellationToken ct) =>
-        throw new InvalidOperationException("分析管线尚未接入，暂时无法生成报告。");
-}
 public sealed class AnalysisWorker(IServiceScopeFactory scopes, AnalysisQueue queue,
     AnalysisProgressWriter progress, ILogger<AnalysisWorker> logger) : BackgroundService
 {
@@ -60,8 +55,7 @@ public sealed class AnalysisWorker(IServiceScopeFactory scopes, AnalysisQueue qu
                 // SDK exceptions may contain upstream bodies or credentials. Never persist or log their raw message.
                 logger.LogWarning("任务 {TaskId} 分析失败（{Type}）。", id, ex.GetType().Name);
                 var message = ex is AnalysisException ? ex.Message :
-                    ex is InvalidOperationException && ex.Message == "分析管线尚未接入，暂时无法生成报告。"
-                    ? ex.Message : "分析失败，请检查视频、模型配置、网络或服务端日志中的错误类型。";
+                    "分析失败，请检查视频、模型配置、网络或服务端日志中的错误类型。";
                 await progress.UpdateAsync(id, AnalysisTaskStatus.Failed, 0, "分析失败", error: message);
             }
             finally

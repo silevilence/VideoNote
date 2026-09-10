@@ -9,7 +9,7 @@
 @using VideoNote.Client.Services
 
 <PageTitle>任务详情 · VideoNote</PageTitle>
-<AnalysisWatch TaskId="Id" Refresh="() => Run(RefreshTask)" />
+<AnalysisWatch TaskId="Id" Refresh="() => Run(RefreshTask)" TextReceived="ReceiveText" />
 
 @if (Busy && _task is null)
 {
@@ -93,10 +93,34 @@ else
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
             解读报告
         </h2>
-        <div class="empty" style="padding:2rem 1.2rem;">
-            <div class="empty-title">报告生成尚未开启</div>
-            <p class="empty-desc">分析管线还在开发中：当前任务只保存视频与配置选择。管线接入后，最终报告与分段理解将实时显示在这里。</p>
-        </div>
+        @if (!string.IsNullOrEmpty(_task.ResultText))
+        {
+            <div class="preview-box" data-testid="final-report"><pre>@_task.ResultText</pre></div>
+        }
+        else if (_report.Length > 0)
+        {
+            <p class="hint">当前生成片段，尚未形成完整报告。</p>
+            <div class="preview-box" aria-live="polite"><pre>@_report</pre></div>
+        }
+        else
+        {
+            <p class="dim">@(Ui.IsActive(_task.Status) ? "分析完成后显示最终报告，生成时实时展示。" : "此任务未生成报告。")</p>
+        }
+    </section>
+
+    <section class="panel">
+        <h2 class="panel-title">分段理解</h2>
+        @foreach (var segment in _task.Segments ?? [])
+        {
+            <details class="preview-box" open>
+                <summary>第 @(segment.Index + 1) 段 · @segment.StartSeconds.ToString("F1")–@segment.EndSeconds.ToString("F1") 秒</summary>
+                <pre>@segment.Text</pre>
+            </details>
+        }
+        @foreach (var entry in _live.Where(p => !(_task.Segments?.Any(s => s.Index == p.Key) ?? false)))
+        {
+            <div class="preview-box" aria-live="polite"><span>第 @(entry.Key + 1) 段 · @(Ui.IsActive(_task.Status) ? "生成中" : "未完成片段")</span><pre>@entry.Value</pre></div>
+        }
     </section>
 
     @if (_task.PromptContentSnapshot is { } snapshot)
@@ -115,13 +139,26 @@ else
     [Parameter] public Guid Id { get; set; }
 
     private TaskDto? _task;
+    private string _report = "";
+    private readonly Dictionary<int, string> _live = [];
+    private Guid _loadedId;
     private List<ModelDto> _models = [];
     private List<PromptDto> _prompts = [];
 
     private string? ModelName => _models.FirstOrDefault(m => m.Id == _task?.ModelConfigId)?.ModelId;
     private string? PromptName => _prompts.FirstOrDefault(p => p.Id == _task?.PromptTemplateId)?.Name;
 
-    protected override Task OnInitializedAsync() => Run(Load);
+    protected override Task OnParametersSetAsync()
+    {
+        if (_loadedId != Id) { _report = ""; _live.Clear(); _loadedId = Id; }
+        return Run(Load);
+    }
+    private void ReceiveText(AnalysisText update)
+    {
+        if (update.Stage == "understanding") _live[update.SegmentIndex] =
+            (_live.GetValueOrDefault(update.SegmentIndex) ?? "") + update.Text;
+        if (update.Stage == "report") _report += update.Text;
+    }
 
     private async Task Load()
     {

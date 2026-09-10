@@ -12,5 +12,6 @@ public sealed class CreateTaskInput
 }
 public sealed record TaskDto(Guid Id, string OriginalFileName, AnalysisMode Mode, AnalysisTaskStatus Status,
     string? StageDescription, DateTime CreatedAtUtc, Guid? ModelConfigId, Guid? PromptTemplateId, string? PromptContentSnapshot = null, int ProgressPercent = 0, string? ErrorMessage = null,
-    string? ResultText = null, DateTime? StartedAtUtc = null, DateTime? CompletedAtUtc = null);
+    string? ResultText = null, DateTime? StartedAtUtc = null, DateTime? CompletedAtUtc = null, IReadOnlyList<SegmentResultDto>? Segments = null);
+public sealed record SegmentResultDto(int Index, double StartSeconds, double EndSeconds, string Text);
 public sealed record UploadLimitsDto(long MaxBytes, string[] AllowedExtensions);

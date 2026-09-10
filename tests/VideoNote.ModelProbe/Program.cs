@@ -7,6 +7,7 @@ using VideoNote.Server.Configuration;
 using VideoNote.Server.Data;
 using VideoNote.Server.Data.Entities;
 
+if (args.Contains("--pipeline")) return await PipelineLiveProbe.RunAsync();
 // This program alone resolves the credential at call time. Never print settings, headers or raw exceptions.
 await using var connection = new SqliteConnection("Data Source=:memory:");
 await connection.OpenAsync();

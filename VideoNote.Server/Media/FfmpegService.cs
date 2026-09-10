@@ -11,6 +11,7 @@ public interface IFfmpegService
     Task<IReadOnlyList<VideoSegment>> SegmentAsync(string source, Guid taskId, CancellationToken ct = default);
     Task<IReadOnlyList<VideoFrame>> ExtractFramesAsync(string source, Guid taskId, CancellationToken ct = default);
     Task<string> ExtractAudioAsync(string source, Guid taskId, string format = "wav", CancellationToken ct = default);
+    Task<string> ExtractVideoRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default);
     Task<string> ExtractAudioRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default);
     Task<string?> ExtractSubtitlesAsync(string source, Guid taskId, CancellationToken ct = default);
 }
@@ -95,12 +96,23 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
         return output;
     }
 
+    public async Task<string> ExtractVideoRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default)
+    {
+        if (!double.IsFinite(start) || !double.IsFinite(end) || start < 0 || end <= start)
+            throw new ArgumentException("视频分段范围无效。");
+        var directory = Directory.CreateDirectory(Path.Combine(paths.Videos, taskId.ToString("N"), "context-segments")).FullName;
+        var output = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".mp4");
+        await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
+            "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac"], output, ct);
+        return output;
+    }
+
     public async Task<string> ExtractAudioRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default)
     {
         if (!double.IsFinite(start) || !double.IsFinite(end) || start < 0 || end <= start)
             throw new ArgumentException("音频分段范围无效。");
         var directory = Directory.CreateDirectory(Path.Combine(paths.Audio, taskId.ToString("N"))).FullName;
-        var output = Path.Combine(directory, $"audio_{(long)(start * 1000):D12}_{(long)(end * 1000):D12}.mp3");
+        var output = Path.Combine(directory, $"audio_{(long)(start * 1000):D12}_{(long)(end * 1000):D12}_{Guid.NewGuid():N}.mp3");
         await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
             "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame"], output, ct);
         return output;

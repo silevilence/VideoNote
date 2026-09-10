@@ -17,7 +17,7 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
     AnalysisQueue queue, IHubContext<AnalysisHub> hub) : ControllerBase
 {
     private static TaskDto Dto(AnalysisTask t, bool includeContent = false) => new(t.Id, t.OriginalFileName, t.Mode, t.Status, t.StageDescription, t.CreatedAtUtc, t.ModelConfigId, t.PromptTemplateId, includeContent ? t.PromptContentSnapshot : null,
-        t.ProgressPercent, t.ErrorMessage, includeContent ? t.ResultText : null, t.StartedAtUtc, t.CompletedAtUtc);
+        t.ProgressPercent, t.ErrorMessage, includeContent ? t.ResultText : null, t.StartedAtUtc, t.CompletedAtUtc, includeContent ? System.Text.Json.JsonSerializer.Deserialize<List<SegmentResultDto>>(t.SegmentResultsJson) : null);
     [HttpGet("upload-limits")]
     public UploadLimitsDto Limits() => new(options.Value.MaxBytes, options.Value.AllowedExtensions);
 
