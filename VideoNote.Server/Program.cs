@@ -17,6 +17,12 @@ builder.Services.AddRazorComponents()
 builder.Services.AddControllers();
 builder.Services.AddSingleton<VideoNote.Server.Configuration.ProviderSecrets>();
 builder.Services.AddSignalR();
+builder.Services.AddOptions<VideoNote.Server.Analysis.AnalysisOptions>().BindConfiguration("Analysis")
+    .Validate(o => o.MaxConcurrency == 1, "当前版本仅支持串行分析，MaxConcurrency 必须为 1。").ValidateOnStart();
+builder.Services.AddSingleton<VideoNote.Server.Analysis.AnalysisQueue>();
+builder.Services.AddSingleton<VideoNote.Server.Analysis.AnalysisProgressWriter>();
+builder.Services.AddScoped<VideoNote.Server.Analysis.IAnalysisPipeline, VideoNote.Server.Analysis.PendingAnalysisPipeline>();
+builder.Services.AddHostedService<VideoNote.Server.Analysis.AnalysisWorker>();
 builder.Services.AddOptions<UploadOptions>()
     .Configure<IConfiguration>((options, config) => options.Bind(config.GetSection("Upload")))
     .Validate(o => o.MaxBytes > 0 && o.AllowedExtensions is { Length: > 0 } &&

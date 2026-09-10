@@ -7,12 +7,17 @@ using VideoNote.Server.Storage;
 
 namespace VideoNote.Server.Tests.Api;
 
-public sealed class ApiFactory(Dictionary<string, string?>? overrides = null) : WebApplicationFactory<Program>
+public sealed class ApiFactory(Dictionary<string, string?>? overrides = null, bool runWorker = false) : WebApplicationFactory<Program>
 {
     private readonly string root = "work-tests/" + Guid.NewGuid().ToString("N");
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        if (!runWorker) builder.ConfigureServices(services =>
+        {
+            var worker = services.SingleOrDefault(d => d.ImplementationType == typeof(VideoNote.Server.Analysis.AnalysisWorker));
+            if (worker is not null) services.Remove(worker);
+        });
         builder.ConfigureAppConfiguration((_, config) =>
         {
             var values = new Dictionary<string, string?> { ["Storage:RootPath"] = root, ["Logging:LogLevel:Default"] = "None" };

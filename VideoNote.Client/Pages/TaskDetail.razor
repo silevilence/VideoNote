@@ -9,6 +9,7 @@
 @using VideoNote.Client.Services
 
 <PageTitle>任务详情 · VideoNote</PageTitle>
+<AnalysisWatch TaskId="Id" Refresh="() => Run(RefreshTask)" />
 
 @if (Busy && _task is null)
 {
@@ -45,6 +46,10 @@ else
             </p>
         </div>
         <div class="head-actions">
+            @if (Ui.IsActive(_task.Status))
+            {
+                <button class="btn btn-danger" disabled="@Busy" @onclick="Cancel">取消分析</button>
+            }
             <NavLink class="btn btn-ghost" href="tasks">
                 <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 返回列表
@@ -78,7 +83,9 @@ else
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
             当前阶段
         </h2>
-        <p class="dim">@(_task.StageDescription ?? "暂无阶段信息。")</p>
+        <p class="dim">@(_task.StageDescription ?? "暂无阶段信息。") · @_task.ProgressPercent%</p>
+        <progress max="100" value="@_task.ProgressPercent" aria-label="分析进度"></progress>
+        <ErrorAlert Message="@_task.ErrorMessage" />
     </section>
 
     <section class="panel">
@@ -122,6 +129,13 @@ else
         _models = await Api.Get<List<ModelDto>>("api/models");
         _prompts = await Api.Get<List<PromptDto>>("api/prompts");
     }
+
+    private async Task RefreshTask() => _task = await Api.Get<TaskDto>($"api/tasks/{Id}");
+    private Task Cancel() => Run(async () =>
+    {
+        await Api.Send(HttpMethod.Post, $"api/tasks/{Id}/cancel", new { });
+        await RefreshTask();
+    });
 
     private Task Delete() => Run(async () =>
     {

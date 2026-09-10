@@ -1,0 +1,69 @@
+@implements IAsyncDisposable
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.SignalR.Client
+@using VideoNote.Shared.Contracts
+@using System.Threading
+
+@if (_offline)
+{
+    <p class="hint" role="status">实时连接暂不可用，正在自动刷新并重连。</p>
+}
+
+@code {
+    [Parameter] public Guid? TaskId { get; set; }
+    [Parameter] public EventCallback Refresh { get; set; }
+    [Parameter] public EventCallback<AnalysisText> TextReceived { get; set; }
+    private HubConnection? _hub;
+    private readonly CancellationTokenSource _stop = new();
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private Task? _poll;
+    private bool _offline;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _hub = new HubConnectionBuilder().WithUrl(Navigation.ToAbsoluteUri("hubs/analysis"))
+            .WithAutomaticReconnect().Build();
+        _hub.On<AnalysisProgress>("AnalysisProgress", p =>
+            TaskId is null || TaskId == p.TaskId ? Reload() : Task.CompletedTask);
+        _hub.On<AnalysisText>("AnalysisText", t =>
+            TaskId == t.TaskId && !_stop.IsCancellationRequested
+                ? InvokeAsync(() => TextReceived.InvokeAsync(t)) : Task.CompletedTask);
+        _hub.Reconnected += _ => Reload();
+        _poll = Poll();
+        await Task.CompletedTask;
+    }
+    private async Task Reload()
+    {
+        if (_stop.IsCancellationRequested) return;
+        if (!await _refreshGate.WaitAsync(0)) return;
+        try { if (!_stop.IsCancellationRequested) await InvokeAsync(() => Refresh.InvokeAsync()); }
+        finally { _refreshGate.Release(); }
+    }
+    private async Task Poll()
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+            do
+            {
+                if (_hub!.State == HubConnectionState.Disconnected)
+                {
+                    try { await _hub.StartAsync(_stop.Token); }
+                    catch (Exception) when (!_stop.IsCancellationRequested) { }
+                }
+                _offline = _hub.State != HubConnectionState.Connected;
+                await Reload();
+                await InvokeAsync(StateHasChanged);
+            } while (await timer.WaitForNextTickAsync(_stop.Token));
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        await _stop.CancelAsync();
+        if (_poll is not null) await _poll;
+        if (_hub is not null) await _hub.DisposeAsync();
+        _stop.Dispose();
+    }
+}

@@ -8,12 +8,13 @@
 @using VideoNote.Client.Services
 
 <PageTitle>任务列表 · VideoNote</PageTitle>
+<AnalysisWatch Refresh="() => Run(Load)" />
 
 <div class="page-head">
     <div class="titles">
         <span class="eyebrow">SCREENING LOG</span>
         <h1>任务列表</h1>
-        <p class="page-sub">所有已创建的解读任务。点击文件名查看详情；分析管线接入后，这里将实时更新进度。</p>
+        <p class="page-sub">所有已创建的解读任务。状态与进度实时更新，点击文件名查看详情。</p>
     </div>
     <div class="head-actions">
         <button type="button" class="btn btn-ghost" disabled="@Busy" @onclick="() => Run(Load)">
@@ -67,7 +68,7 @@ else
                         <span class="@Ui.ModeClass(task.Mode)">@Ui.ModeName(task.Mode)</span>
                         @if (!string.IsNullOrEmpty(task.StageDescription))
                         {
-                            <span class="desc">@task.StageDescription</span>
+                            <span class="desc">@task.StageDescription · @task.ProgressPercent%</span>
                         }
                     </div>
                 </div>

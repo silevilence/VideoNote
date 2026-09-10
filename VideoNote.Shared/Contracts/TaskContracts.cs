@@ -11,5 +11,6 @@ public sealed class CreateTaskInput
     public Guid? PromptTemplateId { get; set; }
 }
 public sealed record TaskDto(Guid Id, string OriginalFileName, AnalysisMode Mode, AnalysisTaskStatus Status,
-    string? StageDescription, DateTime CreatedAtUtc, Guid? ModelConfigId, Guid? PromptTemplateId, string? PromptContentSnapshot = null);
+    string? StageDescription, DateTime CreatedAtUtc, Guid? ModelConfigId, Guid? PromptTemplateId, string? PromptContentSnapshot = null, int ProgressPercent = 0, string? ErrorMessage = null,
+    string? ResultText = null, DateTime? StartedAtUtc = null, DateTime? CompletedAtUtc = null);
 public sealed record UploadLimitsDto(long MaxBytes, string[] AllowedExtensions);
