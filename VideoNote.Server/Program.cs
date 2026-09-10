@@ -19,6 +19,7 @@ builder.Services.AddSingleton<VideoNote.Server.Configuration.ProviderSecrets>();
 builder.Services.AddSignalR();
 builder.Services.AddOptions<VideoNote.Server.Analysis.AnalysisOptions>().BindConfiguration("Analysis")
     .Validate(o => o.MaxConcurrency == 1, "当前版本仅支持串行分析，MaxConcurrency 必须为 1。").ValidateOnStart();
+builder.Services.AddScoped<VideoNote.Server.Analysis.IMediaPreprocessor, VideoNote.Server.Analysis.MediaPreprocessor>();
 builder.Services.AddSingleton<VideoNote.Server.Analysis.AnalysisQueue>();
 builder.Services.AddSingleton<VideoNote.Server.Analysis.AnalysisProgressWriter>();
 builder.Services.AddScoped<VideoNote.Server.Analysis.IAnalysisPipeline, VideoNote.Server.Analysis.PendingAnalysisPipeline>();

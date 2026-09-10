@@ -11,6 +11,7 @@ public interface IFfmpegService
     Task<IReadOnlyList<VideoSegment>> SegmentAsync(string source, Guid taskId, CancellationToken ct = default);
     Task<IReadOnlyList<VideoFrame>> ExtractFramesAsync(string source, Guid taskId, CancellationToken ct = default);
     Task<string> ExtractAudioAsync(string source, Guid taskId, string format = "wav", CancellationToken ct = default);
+    Task<string> ExtractAudioRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default);
     Task<string?> ExtractSubtitlesAsync(string source, Guid taskId, CancellationToken ct = default);
 }
 
@@ -91,6 +92,17 @@ public sealed class FfmpegService(WorkDirectoryPaths paths, MediaProcessRunner r
         var output = Path.Combine(Directory.CreateDirectory(Path.Combine(paths.Audio, taskId.ToString("N"))).FullName, "audio." + format);
         await EncodeAsync(["-i", source, "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a",
             format == "wav" ? "pcm_s16le" : "libmp3lame"], output, ct);
+        return output;
+    }
+
+    public async Task<string> ExtractAudioRangeAsync(string source, Guid taskId, double start, double end, CancellationToken ct = default)
+    {
+        if (!double.IsFinite(start) || !double.IsFinite(end) || start < 0 || end <= start)
+            throw new ArgumentException("音频分段范围无效。");
+        var directory = Directory.CreateDirectory(Path.Combine(paths.Audio, taskId.ToString("N"))).FullName;
+        var output = Path.Combine(directory, $"audio_{(long)(start * 1000):D12}_{(long)(end * 1000):D12}.mp3");
+        await EncodeAsync(["-ss", Number(start), "-i", source, "-t", Number(end - start),
+            "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame"], output, ct);
         return output;
     }
 
