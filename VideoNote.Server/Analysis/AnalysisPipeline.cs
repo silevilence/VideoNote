@@ -128,6 +128,7 @@ public sealed class AnalysisPipeline(VideoNoteDbContext db, IMediaPreprocessor p
             if (finish == ChatFinishReason.ContentFilter)
                 throw new AnalysisException("模型内容过滤中止了生成，未生成完整内容；请检查输入或更换模型。");
             if (finish == ChatFinishReason.Length) throw new AnalysisException("模型输出达到长度上限，未生成完整内容，请增大 Pipeline:MaxOutputTokens 或缩短提示词。");
+            if (finish != ChatFinishReason.Stop) throw new AnalysisException("模型未返回成功结束标记，生成可能中断，未保存当前分段或报告，请重试。");
             if (string.IsNullOrWhiteSpace(output.ToString())) throw new AnalysisException("模型未返回有效理解文本，可能被过滤或仅返回思考内容。");
             return output.ToString();
         }

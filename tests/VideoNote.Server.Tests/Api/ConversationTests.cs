@@ -60,11 +60,14 @@ public sealed class ConversationTests
     [InlineData(false, true, "empty")]
     [InlineData(false, true, "failure")]
     [InlineData(false, true, "budget")]
+    [InlineData(false, true, "abrupt")]
+    [InlineData(true, true, "abrupt")]
     public async Task Incomplete_or_failed_replies_never_save_a_turn(bool gemini, bool streaming, string failure)
     {
         await using var mock = await ProtocolEndpoint.Start();
         mock.Filtered = failure == "filter"; mock.Truncate = failure == "length";
         mock.EmptyChat = failure == "empty"; mock.FailChat = failure == "failure";
+        mock.AbruptChat = failure == "abrupt";
         await using var app = new ApiFactory(); using var http = app.CreateClient();
         var (id, _) = await Seed(app, mock, gemini, streaming, failure == "budget" ? 1000 : 128000);
         var events = await Ask(http, id, "question");

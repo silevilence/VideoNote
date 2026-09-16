@@ -13,6 +13,27 @@ namespace VideoNote.Server.Tests.Analysis;
 public sealed class PipelineFailureTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Abrupt_stream_does_not_persist_partial_understanding(bool gemini)
+    {
+        await using var endpoint = await ProtocolEndpoint.Start(); endpoint.AbruptChat = true;
+        await using var original = new ApiFactory(runWorker: true);
+        await using var app = original.WithWebHostBuilder(b => b.ConfigureServices(s =>
+        {
+            s.RemoveAll<IMediaPreprocessor>(); s.AddSingleton<IMediaPreprocessor>(new PreparedStub());
+        }));
+        using var http = app.CreateClient();
+        var model = await PipelineProtocolTests.Seed(app.Services, endpoint.Url, gemini);
+        var task = await Upload(http, model, AnalysisMode.Subtitles);
+        var result = await PipelineProtocolTests.WaitTerminal(http, task.Id);
+        Assert.Equal(AnalysisTaskStatus.Failed, result.Status);
+        Assert.Contains("结束标记", result.ErrorMessage);
+        Assert.Empty(result.Segments!);
+        Assert.Null(result.ResultText);
+    }
+
+    [Theory]
     [InlineData("http")]
     [InlineData("empty")]
     [InlineData("length")]

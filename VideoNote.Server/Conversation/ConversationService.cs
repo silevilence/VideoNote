@@ -40,11 +40,12 @@ public sealed class ConversationService(VideoNoteDbContext db, IModelChatClientF
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions { Name = "VideoNote Assistant", UseProvidedChatClientAsIs = true });
         var runOptions = new ChatClientAgentRunOptions { ChatOptions = new ChatOptions { MaxOutputTokens = options.Value.MaxOutputTokens } };
         var output = new StringBuilder();
+        var completed = false;
         if (model.SupportsStreaming)
         {
             await foreach (var update in agent.RunStreamingAsync(messages, options: runOptions, cancellationToken: ct))
             {
-                if (update.RawRepresentation is ChatResponseUpdate raw) CheckFinish(raw.FinishReason);
+                if (update.RawRepresentation is ChatResponseUpdate raw) completed |= CheckFinish(raw.FinishReason);
                 if (string.IsNullOrEmpty(update.Text)) continue;
                 output.Append(update.Text);
                 if (output.Length > 100_000) throw new ConversationException("对话回复过长，已停止生成且未保存。");
@@ -54,11 +55,12 @@ public sealed class ConversationService(VideoNoteDbContext db, IModelChatClientF
         else
         {
             var response = await agent.RunAsync(messages, options: runOptions, cancellationToken: ct);
-            if (response.RawRepresentation is ChatResponse raw) CheckFinish(raw.FinishReason);
+            if (response.RawRepresentation is ChatResponse raw) completed = CheckFinish(raw.FinishReason);
             output.Append(response.Text);
             if (output.Length > 100_000) throw new ConversationException("对话回复过长，已停止生成且未保存。");
             yield return new("delta", output.ToString());
         }
+        if (!completed) throw new ConversationException("模型未返回成功结束标记，回答可能中断，本轮未保存，请重试。");
         if (string.IsNullOrWhiteSpace(output.ToString())) throw new ConversationException("模型没有返回有效回答，请重试或更换模型。");
         ct.ThrowIfCancellationRequested();
         var now = DateTime.UtcNow;
@@ -70,9 +72,10 @@ public sealed class ConversationService(VideoNoteDbContext db, IModelChatClientF
         yield return new("done");
     }
 
-    private static void CheckFinish(ChatFinishReason? reason)
+    private static bool CheckFinish(ChatFinishReason? reason)
     {
         if (reason == ChatFinishReason.Length || reason == ChatFinishReason.ContentFilter)
             throw new ConversationException("模型因长度限制或内容过滤中断回答，本轮未保存，请调整设置或更换模型。");
+        return reason == ChatFinishReason.Stop;
     }
 }
