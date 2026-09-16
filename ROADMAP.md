@@ -4,12 +4,13 @@
 
 ## 🚧 开发中 (In Progress)
 
-- [ ] **补充 latest 镜像标签与默认部署示例**
+## ✅ 已完成 (Completed)
+
+- [x] **补充 latest 镜像标签与默认部署示例**
     - 已确认：给现有 `0.1.0` 镜像补上 `latest`，不重建镜像、不移动 `V0.1.0` Git tag；后续正式发布成功后同步更新 `latest`。
     - 已确认：Compose 默认使用 `latest`，保留 `VIDEONOTE_VERSION` 覆盖固定版本。
     - 验收：`latest` 与 `0.1.0` 注册表 manifest 摘要一致；工作流语法通过；同步发布与部署文档。
-
-## ✅ 已完成 (Completed)
+    - 结果：2026-09-16 Actions 35068384817 成功，仅运行 latest 任务；两个标签匿名访问均返回 HTTP 200，摘要相同。Compose YAML 与 actionlint 校验通过，V0.1.0 Git tag 未改变。
 
 - [x] **版本 Tag 自动发布**（推送版本 tag 触发 Actions：GHCR 镜像 + Release）
     - [x] 触发条件：推送形如 `V0.1.0` 的版本 tag 时自动发布，大小写不敏感（`v0.1.0` 与 `V0.1.0` 同等处理）；非版本 tag 不触发

@@ -54,4 +54,10 @@ gh workflow run release.yml --ref main -f version=0.1.0
 - [V0.1.0 Release](https://github.com/silevilence/VideoNote/releases/tag/V0.1.0) 已正式发布（非草稿、非预发布），通过 API 读取正文并与本地提取结果比较，一致。
 - 本机无 Docker；容器启动、Compose 拉取与容器内分析/对话主链路未验证。本次发布任务不调用真实模型。
 
+### latest 补标签验收（2026-09-16）
+
+- [Actions 运行 35068384817](https://github.com/silevilence/VideoNote/actions/runs/35068384817) 使用手动入口 `version=0.1.0`，仅运行 `latest` 任务，构建与 Release 任务跳过；manifest 复制与内容比较通过。
+- 匿名访问 `0.1.0` 与 `latest` manifest 均返回 HTTP 200，两者摘要同为 `sha256:ad38374c55f9e55742004154808b611d752f6c2d6aacdb784e1fdb20bde63fe4`。没有重新构建镜像，`V0.1.0` Git tag 仍指向 `078893258ae7c782289b9cca6bd7c857065f32dc`。
+- Compose 默认值已改为 `latest`，保留 `VIDEONOTE_VERSION` 覆盖。PyYAML 解析与默认值核对、actionlint 工作流语法检查通过；本机未运行 Docker Compose CLI。
+
 工作流语法与权限依据：[GitHub Actions 工作流语法](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)、[发布 Docker 镜像](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)、[gh release create](https://cli.github.com/manual/gh_release_create)。
