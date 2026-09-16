@@ -1,0 +1,59 @@
+name: Release
+run-name: Release ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - '[vV][0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ghcr.io/silevilence/videonote
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validate changelog and extract release notes
+        id: notes
+        run: python3 scripts/release-notes.py "$GITHUB_REF_NAME" --output "$RUNNER_TEMP/release-notes.md"
+
+      - name: Build image
+        env:
+          VERSION: ${{ steps.notes.outputs.version }}
+        run: |
+          docker build --pull --platform linux/amd64 \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            --tag "$IMAGE:$VERSION" .
+
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Push image
+        env:
+          VERSION: ${{ steps.notes.outputs.version }}
+        run: docker push "$IMAGE:$VERSION"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"

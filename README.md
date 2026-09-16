@@ -10,7 +10,7 @@
 - 后台队列、SignalR 实时进度与生成文本、持久化分步日志、取消分析、Markdown 报告。
 - 单 Assistant Agent 视频问答、流式回复、停止回复、成功问答历史持久化及全局对话模型设置。
 - 本地 SQLite 保存配置与记录，视频和处理物料存本地；删除任务会清理物料和对话。
-- 可选容器部署：仓库提供镜像构建文件与单服务 Compose 示例，镜像内含 ASP.NET Core 运行时与 FFmpeg，页面、接口与实时推送共用一个端口，数据与密钥环集中挂载；镜像尚未发布，容器未实测。
+- 可选容器部署：仓库提供镜像构建文件与单服务 Compose 示例，镜像内含 ASP.NET Core 运行时与 FFmpeg，页面、接口与实时推送共用一个端口，数据与密钥环集中挂载；版本 tag 自动发布到 GHCR，实际验证状态见[发布说明](docs/release.md)。
 
 ## Windows 快速启动
 
@@ -68,7 +68,7 @@ dotnet VideoNote.Server.dll --urls http://127.0.0.1:5132
 
 ## Docker 部署示例
 
-仓库提供 [Dockerfile](Dockerfile) 和单服务 [compose.yaml](compose.yaml)，使用本仓库 GHCR 镜像 `ghcr.io/silevilence/videonote`，示例假设 `0.1.0` 版本镜像已发布。当前只交付打包与部署文件：镜像构建与推送尚无实现（见 [ROADMAP](ROADMAP.md) 开发中条目），容器构建、启动与容器内主链路也未实测，细节与后续验收步骤见 [Docker 部署与验证](docs/docker.md)。
+仓库提供 [Dockerfile](Dockerfile) 和单服务 [compose.yaml](compose.yaml)，使用本仓库 GHCR 镜像 `ghcr.io/silevilence/videonote`。推送 `V0.1.0` 形式的版本 tag 后，Actions 校验 changelog、构建并推送 `0.1.0` 镜像，再创建 GitHub Release；详见[版本发布与验证状态](docs/release.md)。须等待对应发布成功后再拉取镜像。容器启动与容器内主链路仍需按 [Docker 部署与验证](docs/docker.md) 验收。
 
 在已安装 Docker Engine 和 Compose v2 的主机，将 `compose.yaml` 放入固定的部署目录，在该目录的 PowerShell 7 执行：
 

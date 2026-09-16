@@ -1,6 +1,6 @@
 # Docker 部署与验证
 
-本次交付为仓库根目录的 `Dockerfile`、`.dockerignore` 和 `compose.yaml`。开发机没有 Docker，本次不执行镜像构建或启动；下列 Docker 命令供后续 CD 或具备 Docker 的部署环境使用。GHCR 示例按镜像已经发布书写，不代表目前已经发布或拉取验证通过。
+仓库根目录提供 `Dockerfile`、`.dockerignore` 和 `compose.yaml`，版本 tag 通过 GitHub Actions 自动构建并发布 GHCR 镜像，流程与实际验证状态见[版本发布](release.md)。开发机没有 Docker；下列 Docker 命令供具备 Docker 的部署环境使用。构建发布成功不代表容器启动、拉取及主链路验收通过。
 
 ## 镜像与运行约定
 

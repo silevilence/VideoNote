@@ -10,7 +10,7 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 
 仓库根目录已交付容器部署文件 `Dockerfile`、`.dockerignore`、`compose.yaml` 与说明 `docs/docker.md`。本机无 Docker，只完成发布产物与静态配置核对；镜像构建、容器启动及容器内主链路未实测，不得宣称通过。
 
-版本为 `0.1.0`：应用版本声明在 `VideoNote.Server/VideoNote.Server.csproj`，用户可见变更记录在 `changelog.md`。ROADMAP 开发中仅剩「版本 Tag 自动发布」（推送 `V0.1.0` 形态 tag → 从 changelog 提取对应版本段落，缺失即失败 → 推送 GHCR 镜像 → 创建 Release），尚未实现，仓库内没有工作流文件。
+版本为 `0.1.0`：应用版本声明在 `VideoNote.Server/VideoNote.Server.csproj`，用户可见变更记录在 `changelog.md`。版本 Tag 自动发布已实现在 `.github/workflows/release.yml`：推送 `V0.1.0` 形态 tag → 从 changelog 提取对应版本段落，缺失即失败 → 推送 GHCR 镜像 → 创建 Release。仅使用 `GITHUB_TOKEN`，本机可运行 `python -m unittest discover -s tests/release-tests -v` 验证发布说明校验；真实发布验收状态见 `docs/release.md`。
 
 文档索引：启动、发布与容器用法见 `README.md`；配置项、密钥、备份与恢复见 `docs/configuration.md`；容器部署与验证步骤见 `docs/docker.md`；任务与验收标准见 `ROADMAP.md`；历史验收证据见 `docs/review-*.md`、`docs/verification.md`、`docs/coverage-2026-09-16.md`。
 
