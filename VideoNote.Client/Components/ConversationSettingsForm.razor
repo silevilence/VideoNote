@@ -2,17 +2,27 @@
 @inject VideoNote.Client.Services.ApiClient Api
 @using VideoNote.Shared.Contracts
 <section class="panel" style="margin-bottom:1rem;">
-    <h2 class="panel-title">对话模型</h2>
+    <h2 class="panel-title">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        对话模型 <span class="chip chip-plain">全局偏好</span>
+    </h2>
+    <p class="hint" style="margin:0 0 0.9rem;">指定任务详情页「视频问答」使用的模型；未指定时回退到各任务自己的分析模型。修改对所有任务生效，历史对话保留。</p>
     <ErrorAlert Message="@Error" />
     <NoticeAlert Message="@Notice" />
-    <label for="conversation-model">问答使用的模型</label>
-    <select id="conversation-model" class="form-select" @bind="selected" disabled="@(Busy || !loaded)">
-        <option value="">使用各任务的分析模型（默认）</option>
-        @foreach (var model in Models) { <option value="@model.Id">@model.ModelId</option> }
-    </select>
-    <p class="hint">设置对所有任务生效；历史对话保留。未声明流式能力的模型将在回复完成后显示全文。</p>
-    <button class="btn btn-ghost" disabled="@Busy" @onclick="Reload">重新加载</button>
-    <button class="btn btn-primary" disabled="@(Busy || !loaded)" @onclick="Save">保存对话模型</button>
+    <div class="pref-grid">
+        <div>
+            <label for="conversation-model">问答使用的模型</label>
+            <select id="conversation-model" class="form-select" @bind="selected" disabled="@(Busy || !loaded)">
+                <option value="">使用各任务的分析模型（默认）</option>
+                @foreach (var model in Models) { <option value="@model.Id">@model.ModelId</option> }
+            </select>
+            <p class="hint">未声明流式能力的模型将在回复完成后显示全文。</p>
+        </div>
+        <div style="display:flex; gap:0.55rem;">
+            <button class="btn btn-ghost" disabled="@Busy" @onclick="Reload">重新加载</button>
+            <button class="btn btn-primary" disabled="@(Busy || !loaded)" @onclick="Save">保存对话模型</button>
+        </div>
+    </div>
 </section>
 @code {
     private List<ModelDto> Models = [];

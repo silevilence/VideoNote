@@ -72,8 +72,14 @@ else
                             <span class="desc">@task.StageDescription · @task.ProgressPercent%</span>
                         }
                     </div>
+                    @if (Ui.IsActive(task.Status) && (task.ProgressPercent > 0 || !string.IsNullOrEmpty(task.StageDescription)))
+                    {
+                        <div class="item-progress" aria-hidden="true">
+                            <div class="item-progress-fill" style="width:@task.ProgressPercent%"></div>
+                        </div>
+                    }
                 </div>
-                <span class="tc nowrap">耗时 @Ui.Elapsed(task)<br />@Ui.Time(task.CreatedAtUtc)</span>
+                <span class="tc nowrap" style="text-align:right;">耗时 @Ui.Elapsed(task)<br />@Ui.Time(task.CreatedAtUtc)</span>
                 <div class="item-actions">
                     <button type="button" class="icon-btn danger" title="删除任务及物料" aria-label="删除任务及物料"
                             disabled="@Busy" @onclick="() => Delete(task)">

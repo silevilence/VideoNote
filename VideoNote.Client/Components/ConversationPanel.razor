@@ -1,62 +1,145 @@
-@implements IDisposable
+@implements IAsyncDisposable
 @inject VideoNote.Client.Services.ApiClient Api
+@inject IJSRuntime JS
 @using VideoNote.Shared.Contracts
 @using VideoNote.Shared.Domain
 
-<section class="panel" data-testid="conversation">
-    <h2 class="panel-title">视频问答</h2>
+<section class="panel chat-panel" data-testid="conversation">
+    <div class="chat-head">
+        <span class="chat-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            视频问答
+        </span>
+        @if (Enabled)
+        {
+            <span class="chip chip-plain" style="margin-left:auto;">依据报告与分段理解</span>
+        }
+    </div>
     @if (!Enabled)
     {
-        <p class="hint">任务完成并生成报告后可基于视频内容提问。</p>
+        <div class="chat-locked">
+            <div class="chat-empty-ico">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <p>任务完成并生成报告后可基于视频内容提问。</p>
+        </div>
     }
     else
     {
-        <p class="hint">回答依据完整报告与分段理解。可在<a href="settings">模型设置</a>指定对话模型。</p>
+        <p class="chat-hint">回答依据完整报告与分段理解。可在<a href="settings">模型设置</a>指定对话模型。</p>
         <ErrorAlert Message="@error" />
-        @if (loading) { <p role="status">正在加载对话历史…</p> }
-        else if (!loaded) { <button class="btn btn-ghost" @onclick="Load">重新加载历史</button> }
-        else if (history.Count == 0 && !sending) { <p class="hint">还没有对话，试着问“视频的主要观点是什么？”</p> }
-        @foreach (var message in history)
+        @if (loading)
         {
-            <article class="conversation-message" @key="message.Id">
-                <strong>@(message.Role == ConversationRole.User ? "你" : "视频助手")</strong>
-                <MarkdownContent Text="@message.Content" />
-            </article>
+            <p class="loading-line" role="status"><span class="spinner"></span>正在加载对话历史…</p>
         }
-        @if (sending)
+        else if (!loaded)
         {
-            <article class="conversation-message"><strong>你</strong><p>@pending</p></article>
-            <article class="conversation-message" aria-live="polite" data-testid="conversation-stream">
-                <strong>视频助手 · 生成中</strong>
-                <p style="white-space:pre-wrap;">@(reply.Length == 0 ? "正在思考…" : reply)</p>
-            </article>
+            <button class="btn btn-ghost" @onclick="Load">重新加载历史</button>
         }
-        <label for="conversation-question">你的问题</label>
-        <textarea id="conversation-question" class="form-control" rows="3" maxlength="8000"
-            disabled="@(sending || !loaded)" @bind="question" @bind:event="oninput"></textarea>
-        <div class="head-actions" style="margin-top:.8rem;">
-            @if (sending) { <button class="btn btn-danger" @onclick="Stop">停止回复</button> }
-            else { <button class="btn btn-primary" disabled="@(!loaded || string.IsNullOrWhiteSpace(question))" @onclick="Send">发送问题</button> }
-        </div>
+        else
+        {
+            <div class="chat-scroll" @ref="scrollBox">
+                @if (history.Count == 0 && !sending)
+                {
+                    <div class="chat-empty">
+                        <div class="chat-empty-ico">
+                            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <p>还没有对话，试着从这些问题开始：</p>
+                        <div class="starter-row">
+                            @foreach (var starter in Starters)
+                            {
+                                <button type="button" class="starter" disabled="@sending" @onclick="() => UseStarter(starter)">@starter</button>
+                            }
+                        </div>
+                    </div>
+                }
+                @foreach (var message in history)
+                {
+                    <article class="@MsgClass(message.Role == ConversationRole.User)" @key="message.Id">
+                        <div class="msg-meta"><span>@(message.Role == ConversationRole.User ? "你" : "视频助手")</span></div>
+                        <div class="msg-body"><MarkdownContent Text="@message.Content" /></div>
+                    </article>
+                }
+                @if (sending)
+                {
+                    <article class="@MsgClass(true)">
+                        <div class="msg-meta"><span>你</span></div>
+                        <div class="msg-body">@pending</div>
+                    </article>
+                    <article class="@MsgClass(false) is-streaming" aria-live="polite" data-testid="conversation-stream">
+                        <div class="msg-meta"><span>视频助手 · 生成中</span></div>
+                        <div class="msg-body"><p style="white-space:pre-wrap;">@(reply.Length == 0 ? "正在思考…" : reply)</p></div>
+                    </article>
+                }
+            </div>
+            <div class="chat-composer">
+                <label class="field-label" for="conversation-question" style="margin-bottom:0.45rem;">你的问题</label>
+                <div class="chat-input-row">
+                    <textarea id="conversation-question" class="form-control" rows="2" maxlength="8000"
+                        placeholder="针对视频内容提问，Enter 换行" disabled="@(sending || !loaded)" @bind="question" @bind:event="oninput"></textarea>
+                    @if (sending)
+                    {
+                        <button class="btn btn-danger" @onclick="Stop">停止回复</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-primary" disabled="@(!loaded || string.IsNullOrWhiteSpace(question))" @onclick="Send">发送问题</button>
+                    }
+                </div>
+            </div>
+        }
     }
 </section>
 
 @code {
     [Parameter] public Guid TaskId { get; set; }
     [Parameter] public bool Enabled { get; set; }
+
+    private static readonly string[] Starters =
+    [
+        "视频的主要观点是什么？",
+        "列出视频中的关键要点",
+        "用三句话总结这段视频"
+    ];
+
     private List<ConversationMessageDto> history = [];
     private bool loaded, loading, sending, disposed;
     private string question = "", reply = "", pending = "";
     private string? error;
     private CancellationTokenSource? cancellation;
+    private ElementReference scrollBox;
+    private IJSObjectReference? chatModule;
+    private bool scrollToBottom;
+
     protected override async Task OnParametersSetAsync()
     {
         if (Enabled && !loaded && !loading && error is null) await Load();
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try { chatModule = await JS.InvokeAsync<IJSObjectReference>("import", "./chat.js"); }
+            catch (JSDisconnectedException) { }
+        }
+        if (chatModule is not null && (sending || scrollToBottom))
+        {
+            scrollToBottom = false;
+            try { await chatModule.InvokeVoidAsync("pinBottom", scrollBox); }
+            catch (JSDisconnectedException) { }
+        }
+    }
+
+    private static string MsgClass(bool isUser) => isUser ? "conversation-message msg is-user" : "conversation-message msg is-bot";
+
+    private void UseStarter(string starter) => question = starter;
+
     private async Task Load()
     {
         loading = true;
-        try { history = await Api.Get<List<ConversationMessageDto>>($"api/tasks/{TaskId}/conversation"); loaded = true; error = null; }
+        try { history = await Api.Get<List<ConversationMessageDto>>($"api/tasks/{TaskId}/conversation"); loaded = true; error = null; scrollToBottom = true; }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
         { loaded = false; error = "对话历史加载失败，请重试。"; }
         finally { loading = false; }
@@ -83,5 +166,14 @@
         finally { sending = false; cancellation.Dispose(); cancellation = null; reply = ""; }
     }
     private void Stop() => cancellation?.Cancel();
-    public void Dispose() { disposed = true; cancellation?.Cancel(); }
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        cancellation?.Cancel();
+        if (chatModule is not null)
+        {
+            try { await chatModule.DisposeAsync(); } catch (JSDisconnectedException) { }
+        }
+    }
 }
