@@ -1,10 +1,10 @@
-# Assumes the version tag has already been published to this repository's GHCR.
+# Defaults to latest; set VIDEONOTE_VERSION to pin an existing version.
 # Single instance only: never scale replicas against the same SQLite data volume.
 name: videonote
 
 services:
   videonote:
-    image: ghcr.io/silevilence/videonote:${VIDEONOTE_VERSION:-0.1.0}
+    image: ghcr.io/silevilence/videonote:${VIDEONOTE_VERSION:-latest}
     restart: unless-stopped
     stop_grace_period: 60s
     ports:

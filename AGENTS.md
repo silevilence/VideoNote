@@ -35,6 +35,7 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 - **历史保留策略**：删除提供商时级联删除其模型配置；模型配置或提示词模板删除时，历史分析任务保留且对应外键置空；删除分析任务时级联删除其对话消息。
 - **本地目录约定**：服务端内容根目录下使用 `work/videos`、`work/frames`、`work/audio`、`work/subtitles`，SQLite 数据库位于 `work/videonote.db`，Data Protection 密钥环位于 `work/keys`。容器内内容根为 `/app`，数据卷挂载 `/app/work`，覆盖以上全部内容。
 - **版本与发布**：应用版本只声明在 `VideoNote.Server/VideoNote.Server.csproj` 的 `<Version>`；`changelog.md` 以 `## V<版本>` 段落记录用户可见变更。发布 tag 形如 `V0.1.0`（大小写不敏感），镜像标签去掉 `v` 前缀。改版本时同步这两处，不要在别处另立版本号。
+- **镜像 latest**：正式版本发布成功后同步更新 `latest`，Compose 默认使用它，允许 `VIDEONOTE_VERSION` 固定版本。工作流手动入口接受已存在的镜像版本，仅复制 manifest 补标签，不构建镜像、不移动 Git tag、不重建 Release。
 
 ## 模块与接口
 

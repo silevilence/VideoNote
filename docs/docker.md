@@ -15,13 +15,13 @@
 
 ## 使用已发布的 GHCR 镜像
 
-需要 Linux 容器运行环境与 Docker Compose v2。把 `compose.yaml` 放在固定部署目录，在该目录执行。镜像地址为 `ghcr.io/silevilence/videonote`，默认版本标签为 `0.1.0`（没有 `v` 前缀）。若镜像尚未发布或当前用户没有包读取权限，拉取会失败，须先完成发布或登录有权限的 GHCR 账号。
+需要 Linux 容器运行环境与 Docker Compose v2。把 `compose.yaml` 放在固定部署目录，在该目录执行。镜像地址为 `ghcr.io/silevilence/videonote`，默认镜像标签为 `latest`；可用 `VIDEONOTE_VERSION=0.1.0` 固定版本（没有 `v` 前缀）。若镜像尚未发布或当前用户没有包读取权限，拉取会失败，须先完成发布或登录有权限的 GHCR 账号。
 
 PowerShell 7：
 
 ```powershell
 $env:DEEPSEEK_API_KEY = Read-Host -MaskInput 'DeepSeek API key'
-$env:VIDEONOTE_VERSION = '0.1.0'
+$env:VIDEONOTE_VERSION = 'latest'
 docker compose pull
 docker compose up -d
 ```
@@ -32,7 +32,7 @@ Linux Bash：
 read -rsp 'DeepSeek API key: ' DEEPSEEK_API_KEY
 echo
 export DEEPSEEK_API_KEY
-export VIDEONOTE_VERSION=0.1.0
+export VIDEONOTE_VERSION=latest
 docker compose pull
 docker compose up -d
 ```
@@ -41,7 +41,7 @@ Compose 透传环境变量，不在文件中保存密钥值；更新密钥后在
 
 | 宿主机环境变量 | 默认值 | 用途 |
 |---|---|---|
-| `VIDEONOTE_VERSION` | `0.1.0` | GHCR 已发布的镜像标签 |
+| `VIDEONOTE_VERSION` | `latest` | GHCR 镜像标签，可指定固定版本 |
 | `VIDEONOTE_PORT` | `8080` | 宿主机端口，容器内仍为 8080 |
 | `VIDEONOTE_BIND_ADDRESS` | `127.0.0.1` | 宿主机绑定地址 |
 | `DEEPSEEK_API_KEY` | 不设默认值 | 透传给容器，供预置提供商在调用时解析 |
