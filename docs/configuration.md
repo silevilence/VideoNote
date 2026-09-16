@@ -39,6 +39,8 @@
 
 存储目录必须可写；任务物料操作拒绝符号链接/目录联接。程序还在 `work/keys` 保存 Data Protection 密钥环。开发环境内容根为 `VideoNote.Server`；发布后从发布目录启动，以该目录为内容根。
 
+Docker 示例的内容根为 `/app`，`Storage__RootPath=work`，数据卷挂载 `/app/work`，覆盖数据库、`keys` 和全部媒体。不要把 `Storage__RootPath` 改成绝对路径 `/app/work`。容器使用 `/usr/bin/ffmpeg`、`/usr/bin/ffprobe`，以非 root 用户 `app` 运行。宿主机环境变量 `DEEPSEEK_API_KEY` 经 Compose 透传；容器部署的提供商密钥仅使用环境变量引用。Compose 的 `VIDEONOTE_VERSION`、`VIDEONOTE_PORT`、`VIDEONOTE_BIND_ADDRESS` 是部署参数，不是应用配置键，详见 [Docker 部署与验证](docker.md)。
+
 示例（启动前在当前 PowerShell 会话设置，不包含任何密钥）：
 
 ```powershell

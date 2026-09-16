@@ -1,0 +1,26 @@
+# Only application sources and the SDK selection belong in the build context.
+**
+!global.json
+!VideoNote.Server/
+!VideoNote.Server/**
+!VideoNote.Client/
+!VideoNote.Client/**
+!VideoNote.Shared/
+!VideoNote.Shared/**
+
+# Never copy host build outputs, local data, secrets or deployment overrides.
+**/[Bb]in/
+**/[Oo]bj/
+**/work/
+**/work-*/
+**/keys/
+**/.env*
+**/*.db
+**/*.db-*
+**/*.sqlite*
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.user
+**/appsettings.*.json
+**/Properties/launchSettings.json

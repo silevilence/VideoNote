@@ -1,0 +1,27 @@
+# Assumes the version tag has already been published to this repository's GHCR.
+# Single instance only: never scale replicas against the same SQLite data volume.
+name: videonote
+
+services:
+  videonote:
+    image: ghcr.io/silevilence/videonote:${VIDEONOTE_VERSION:-0.1.0}
+    restart: unless-stopped
+    stop_grace_period: 60s
+    ports:
+      # WASM, REST API and SignalR share this one port.
+      - "${VIDEONOTE_BIND_ADDRESS:-127.0.0.1}:${VIDEONOTE_PORT:-8080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      Storage__RootPath: work
+      ConnectionStrings__VideoNote: "Data Source=videonote.db"
+      Ffmpeg__FfmpegPath: /usr/bin/ffmpeg
+      Ffmpeg__FfprobePath: /usr/bin/ffprobe
+      # Pass through the host process environment; no key value belongs in this file.
+      DEEPSEEK_API_KEY:
+    volumes:
+      # Includes videonote.db, keys/, videos/, frames/, audio/ and subtitles/.
+      - videonote-data:/app/work
+
+volumes:
+  videonote-data:

@@ -8,7 +8,13 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 
 项目已完成三层架构、提供商/模型/提示词管理、流式上传、后台队列、三种模式预处理、分段理解与报告组合。新建页支持本次任务提示词内联快照并要求选择模型；列表/详情提供实时进度、耗时、持久化分步日志、安全 Markdown 报告与取消。完成任务可通过 Microsoft.Agents.AI 单 Assistant Agent 进行流式问答，成功问答成对保存，设置页可指定全局对话模型。
 
-2026-09-16 按 ROADMAP 开发中五项顺序执行，逐项快速审核、修复、原地勾选并本地提交，最终完整审核以 f8ba2a2 为基线。配置说明见 `docs/configuration.md`，启动与发布见 `README.md`，本轮验收证据见 `docs/review-2026-09-16.md`。Gemini 视频和转写继续采用本地协议模拟；DeepSeek 抽帧、字幕与对话使用合成内容真实验证，本轮最多 20 次模型请求。未通过的验收不得勾选或宣称完成。
+仓库根目录已交付容器部署文件 `Dockerfile`、`.dockerignore`、`compose.yaml` 与说明 `docs/docker.md`。本机无 Docker，只完成发布产物与静态配置核对；镜像构建、容器启动及容器内主链路未实测，不得宣称通过。
+
+版本为 `0.1.0`：应用版本声明在 `VideoNote.Server/VideoNote.Server.csproj`，用户可见变更记录在 `changelog.md`。ROADMAP 开发中仅剩「版本 Tag 自动发布」（推送 `V0.1.0` 形态 tag → 从 changelog 提取对应版本段落，缺失即失败 → 推送 GHCR 镜像 → 创建 Release），尚未实现，仓库内没有工作流文件。
+
+文档索引：启动、发布与容器用法见 `README.md`；配置项、密钥、备份与恢复见 `docs/configuration.md`；容器部署与验证步骤见 `docs/docker.md`；任务与验收标准见 `ROADMAP.md`；历史验收证据见 `docs/review-*.md`、`docs/verification.md`、`docs/coverage-2026-09-16.md`。
+
+验收约定（2026-09-16 起沿用）：Gemini 视频与转写使用本地协议模拟端点；DeepSeek 抽帧、字幕与对话使用合成内容真实验证，探针请求计数累计最多 20 次。未通过的验收不得勾选或宣称完成。
 
 ## 技术栈（已确认决策）
 
@@ -25,9 +31,17 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 - **模型配置两级**：提供商（名称、协议类型、BaseUrl、ApiKey、可选转写模型）→ 模型（ModelId、能力标记、上下文窗口）。能力标记：思考、工具使用、流式、多模态（图像/音频/视频）。
 - **模型选择规则**：按模式自动过滤候选模型（直接理解→视频能力；抽帧→图像能力；字幕→文本模型；音频直传→音频能力），**允许手动覆盖**。
 - **Agent 对话上下文** = 最终报告 + 全部分段理解文本，每次请求一条系统消息注入，随后加载成功问答历史；不把材料重复保存到历史。超过保守上下文预算明确拒绝，不截断。只有成功完整问答在同一事务成对保存；生成时阻止同任务重复提问和删除。全局对话模型保存在 SQLite，未指定回退任务分析模型。
-- **存储**：视频与处理物料存本地工作目录，元数据存 SQLite。本机 Windows 运行，不引入容器化依赖。
+- **存储**：视频与处理物料存本地工作目录，元数据存 SQLite。保留本机 Windows 运行方式，另提供可选 Linux Docker 镜像与单服务 Compose 部署示例；容器通过 `/app/work` 持久化数据库、密钥环及媒体。
 - **历史保留策略**：删除提供商时级联删除其模型配置；模型配置或提示词模板删除时，历史分析任务保留且对应外键置空；删除分析任务时级联删除其对话消息。
-- **本地目录约定**：服务端内容根目录下使用 `work/videos`、`work/frames`、`work/audio`、`work/subtitles`，SQLite 数据库位于 `work/videonote.db`。
+- **本地目录约定**：服务端内容根目录下使用 `work/videos`、`work/frames`、`work/audio`、`work/subtitles`，SQLite 数据库位于 `work/videonote.db`，Data Protection 密钥环位于 `work/keys`。容器内内容根为 `/app`，数据卷挂载 `/app/work`，覆盖以上全部内容。
+- **版本与发布**：应用版本只声明在 `VideoNote.Server/VideoNote.Server.csproj` 的 `<Version>`；`changelog.md` 以 `## V<版本>` 段落记录用户可见变更。发布 tag 形如 `V0.1.0`（大小写不敏感），镜像标签去掉 `v` 前缀。改版本时同步这两处，不要在别处另立版本号。
+
+## 模块与接口
+
+- `VideoNote.Client`（Blazor WASM）：页面路由 `/`（总览首页，含新建任务入口）、`/tasks`、`/tasks/new`、`/tasks/{id:guid}`、`/settings`、`/prompts`、`/not-found`。`Services/ApiClient.cs` 是唯一 HTTP 访问层；`wwwroot/upload.js`、`chat.js` 负责浏览器侧流式上传与对话读写，不经 WASM 内存缓冲整个视频。
+- `VideoNote.Server`：`Controllers/` 暴露 `api/providers`、`api/models`、`api/prompts`、`api/tasks`、`api/tasks/{id}/conversation`、`api/settings/conversation`；SignalR 中心为 `/hubs/analysis`。子目录职责：`Analysis/`（队列、Worker、预处理、分段规划、管线、进度、上下文预算）、`Media/`（FFmpeg 封装）、`AI/`（ChatClientFactory、GeminiFileService）、`Transcription/`、`Conversation/`、`Storage/`、`Data/`（EF 实体与迁移）、`Configuration/`（密钥引用与解析）。
+- `VideoNote.Shared`：`Contracts/` 为跨层 DTO 与事件，`Domain/` 为共享枚举与规则（分析模式、任务状态、对话角色、能力匹配规则、内置模板规则）。跨层新增字段先加在这里。
+- `tests/`：`VideoNote.Server.Tests`（xUnit + `WebApplicationFactory`，覆盖 API、管线、媒体与迁移）、`VideoNote.ModelProbe`（真实模型探针）、`browser/`（Playwright 脚本）。
 
 ## 默认模型配置
 
@@ -45,7 +59,7 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 
 - Windows 11；.NET SDK 10.0.301（另有 6.0/8.0/9.0）
 - FFmpeg 7.1.1（gyan.dev full build）已在 PATH
-- Docker 不可用，按本机 Windows 运行设计（ASP.NET Core 跨平台，迁移时仅需调整 FFmpeg 路径配置）
+- Docker 不可用；Docker 任务在本机仅验证发布产物与配置文件，不执行镜像构建/启动。容器构建、启动和主链路实测留待具备 Docker 的环境，未实测不得宣称通过。
 - VS Code 从仓库根目录按 F5：先构建 Server 项目，再使用现有 `http` 启动配置运行并打开浏览器；工作目录为 `VideoNote.Server`。
 
 ## 开发约定
@@ -53,11 +67,13 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 - 每条任务的功能要求与验收标准以 `ROADMAP.md` 对应条目为准，实现完成后按验收标准逐条验证。
 - 需求存在歧义时先与用户核对（采用对话确认制），不擅自扩大范围。
 - 新确认的需求决策先回写 ROADMAP/本文档，再进入实现。
+- 用户可见行为、操作方式或配置项变化时，同步更新受影响文档：用法进 `README.md`，配置与部署进 `docs/`，版本段落进 `changelog.md`。只改代码不改文档视为未完成。
 
 ## 验证与维护
 
 - `dotnet test tests/VideoNote.Server.Tests --collect "XPlat Code Coverage" --settings tests/coverage.runsettings`：独立工作目录、本地协议端点和真实 FFmpeg；包含 125 秒延迟回归，不需要真实模型密钥。
 - `dotnet publish VideoNote.Server -c Release -o work-tests/pipeline-publish` 后运行 `node tests/browser/pipeline.cjs`：依赖 `work-tests/browser/node_modules/playwright`、Edge 与 PATH 中的 ffmpeg（脚本用 ffmpeg 合成无声样例视频），脚本只管理自己的测试进程。
+- `tests/browser/upload.cjs`、`settings.cjs`、`prompts.cjs` 不自行启动服务：需手动启动一个默认初始数据的实例并监听 5189（例如 `dotnet run --project VideoNote.Server -- --urls http://localhost:5189`），或用 `VIDEONOTE_TEST_URL` 指向其他地址；`upload.cjs` 另需 `pwsh -File tests/fixtures/generate-large.ps1` 生成的 `work-tests/large.mp4`。
 - 单实例运行；分析及对话请求准入、删除复用 AnalysisQueue.Gate。不要让多实例共用数据库。
 - multipart 上传必须使用 StreamingUploadAttribute 禁用 MVC 的自动表单读取；不得使用 IFormFile 缓冲视频。
 - 模型输出视为不可信数据；Markdown 禁止原始 HTML 与危险链接协议。错误与日志不得包含提供商密钥或上游原始响应。

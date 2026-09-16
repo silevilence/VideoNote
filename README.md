@@ -10,6 +10,7 @@
 - 后台队列、SignalR 实时进度与生成文本、持久化分步日志、取消分析、Markdown 报告。
 - 单 Assistant Agent 视频问答、流式回复、停止回复、成功问答历史持久化及全局对话模型设置。
 - 本地 SQLite 保存配置与记录，视频和处理物料存本地；删除任务会清理物料和对话。
+- 可选容器部署：仓库提供镜像构建文件与单服务 Compose 示例，镜像内含 ASP.NET Core 运行时与 FFmpeg，页面、接口与实时推送共用一个端口，数据与密钥环集中挂载；镜像尚未发布，容器未实测。
 
 ## Windows 快速启动
 
@@ -65,9 +66,24 @@ dotnet VideoNote.Server.dll --urls http://127.0.0.1:5132
 
 升级前停止自己的服务并备份完整 `work`（包括数据库、`keys` 和媒体）。覆盖发布文件时保留工作数据和部署配置；启动会自动迁移。勿让多个服务实例共用同一数据库，队列和运行锁设计为单实例。停机中断的分析会标记失败，尚未执行的队列可在重启后继续。
 
+## Docker 部署示例
+
+仓库提供 [Dockerfile](Dockerfile) 和单服务 [compose.yaml](compose.yaml)，使用本仓库 GHCR 镜像 `ghcr.io/silevilence/videonote`，示例假设 `0.1.0` 版本镜像已发布。当前只交付打包与部署文件：镜像构建与推送尚无实现（见 [ROADMAP](ROADMAP.md) 开发中条目），容器构建、启动与容器内主链路也未实测，细节与后续验收步骤见 [Docker 部署与验证](docs/docker.md)。
+
+在已安装 Docker Engine 和 Compose v2 的主机，将 `compose.yaml` 放入固定的部署目录，在该目录的 PowerShell 7 执行：
+
+```powershell
+$env:DEEPSEEK_API_KEY = Read-Host -MaskInput 'DeepSeek API key'
+$env:VIDEONOTE_VERSION = '0.1.0'
+docker compose pull
+docker compose up -d
+```
+
+打开 [VideoNote 容器页面](http://localhost:8080)。默认仅绑定宿主机 `127.0.0.1:8080`；用 `VIDEONOTE_PORT` 修改宿主机端口，容器内部仍为 8080。前端、REST API 和 SignalR 共用此端口。Linux shell 注入环境变量的方法、持久化、升级及后续验收步骤见 [Docker 部署与验证](docs/docker.md)。
+
 ## 配置与开发验证
 
-全部配置项、转写优先级、密钥和备份说明见[配置与运维](docs/configuration.md)。实现与验收状态见 [ROADMAP](ROADMAP.md)，本轮证据见[审核记录](docs/review-2026-09-16.md)。
+全部配置项、转写优先级、密钥和备份说明见[配置与运维](docs/configuration.md)。实现与验收状态见 [ROADMAP](ROADMAP.md)，本轮证据见[审核记录](docs/review-2026-09-16.md)，版本变更见 [changelog.md](changelog.md)。
 
 ```powershell
 dotnet build VideoNote.Server.sln
@@ -84,6 +100,6 @@ dotnet publish VideoNote.Server -c Release -o work-tests/pipeline-publish
 node tests/browser/pipeline.cjs
 ```
 
-脚本启动自己的独立服务（端口 5196）和空数据库，结束后关闭测试进程。真实 DeepSeek 合成物料验收命令为 `dotnet run --project tests/VideoNote.ModelProbe -- --pipeline`，会访问提供商并产生费用。探针关闭 SDK 自动重试，并把实际请求计数保存在 `work-tests/live-pipeline/request-count.txt`，累计最多 20 次；重新验收应先明确新的费用预算。
+脚本启动自己的独立服务（端口 5196）和空数据库，结束后关闭测试进程。另有 `tests/browser/upload.cjs`、`settings.cjs`、`prompts.cjs` 三个脚本，需自行启动一个默认初始数据的实例并让它监听 5189（`dotnet run --project VideoNote.Server -- --urls http://localhost:5189`，或用 `VIDEONOTE_TEST_URL` 指向其他地址）；上传脚本还需先用 `pwsh -File tests/fixtures/generate-large.ps1` 生成 320 MiB 样例。真实 DeepSeek 合成物料验收命令为 `dotnet run --project tests/VideoNote.ModelProbe -- --pipeline`，需已设置 `DEEPSEEK_API_KEY`，会访问提供商并产生费用。探针关闭 SDK 自动重试，并把实际请求计数保存在 `work-tests/live-pipeline/request-count.txt`，累计最多 20 次；重新验收应先明确新的费用预算。
 
 项目分层：`VideoNote.Client` 为 Blazor WASM 界面，`VideoNote.Server` 承载 API、SignalR、队列和 AI/FFmpeg 服务，`VideoNote.Shared` 提供共享契约和规则。分析采用固定 Map-Reduce 流程，Microsoft.Agents.AI 仅用于完成后的问答。

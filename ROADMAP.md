@@ -2,16 +2,7 @@
 
 ## 📝 计划中 (Planned)
 
-- [ ] **Docker 镜像打包与部署示例**（Dockerfile + compose 示例，镜像引用本仓库 GHCR）
-    - [ ] Dockerfile：把 Server 发布产物打包为可运行镜像，镜像内含 .NET 10 ASP.NET Core 运行时与 FFmpeg/FFprobe
-        - 任务描述：单个容器内单进程对外提供 WASM 前端、REST API 与 SignalR（不拆分独立前端容器、不内置反向代理）
-    - [ ] 容器运行约定：工作目录（SQLite 数据库、Data Protection 密钥环、媒体物料）落在可挂载的数据目录，密钥仅通过环境变量注入，不写入镜像层
-    - [ ] compose 示例文件：单服务引用本仓库 GHCR 镜像（`ghcr.io/silevilence/videonote`，按已发布假设书写），仅暴露一个前端端口对外，挂载数据卷并透传 `DEEPSEEK_API_KEY`
-        - 任务描述：示例注明单实例运行（勿横向扩副本共用同一数据库），端口默认 8080 且可配置
-    - [ ] 任务描述（本次范围边界）：开发机无 Docker，本任务不做本地构建与启动；镜像构建与推送由后续 CD 负责，本次交付 Dockerfile 与 compose 示例文件
-    - 验收：Dockerfile 各阶段产物路径、入口命令与 `dotnet publish VideoNote.Server -c Release` 输出一致，构建阶段包含 FFmpeg/FFprobe
-    - 验收：compose 示例只有一个对外端口映射（前端与 API/SignalR 同端口），镜像地址指向本仓库 GHCR 仓库，数据卷覆盖包含数据库与 `keys` 的工作目录，环境变量名称与 `docs/configuration.md` 一致
-    - 验收：本机不执行镜像构建/启动；可构建、可启动、上传→分析→报告主链路可用的验证留待具备 Docker 的环境（后续 CD 或用户自行拉取），未实测前不得宣称该条通过
+## 🚧 开发中 (In Progress)
 
 - [ ] **版本 Tag 自动发布**（推送版本 tag 触发 Actions：GHCR 镜像 + Release）
     - [ ] 触发条件：推送形如 `V0.1.0` 的版本 tag 时自动发布，大小写不敏感（`v0.1.0` 与 `V0.1.0` 同等处理）；非版本 tag 不触发
@@ -23,8 +14,6 @@
     - 验收：流水线顺序为「校验更新记录 → 构建推送镜像 → 创建 Release」，校验失败时后续步骤不执行
     - 验收：镜像地址、标签与端口约定与 compose 示例一致；不修改 Dockerfile 与 compose 示例内容
     - 验收：真实触发需推送 tag 并具备 Actions/GHCR 环境，未实测前不得宣称通过
-
-## 🚧 开发中 (In Progress)
 
 ## ✅ 已完成 (Completed)
 
@@ -141,3 +130,15 @@
 - [x] **应用图标**（替换默认浏览器图标）
     - [x] 生成符合 VideoNote 视频解读主题及现有配色的图标，替换默认 favicon
     - 验收：图标文件可正常读取，页面引用新图标，小尺寸下可辨识
+
+- [x] **Docker 镜像打包与部署示例**（Dockerfile + compose 示例，镜像引用本仓库 GHCR）
+    - [x] Dockerfile：把 Server 发布产物打包为可运行镜像，镜像内含 .NET 10 ASP.NET Core 运行时与 FFmpeg/FFprobe
+        - 任务描述：单个容器内单进程对外提供 WASM 前端、REST API 与 SignalR（不拆分独立前端容器、不内置反向代理）
+    - [x] 容器运行约定：工作目录（SQLite 数据库、Data Protection 密钥环、媒体物料）落在可挂载的数据目录，密钥仅通过环境变量注入，不写入镜像层
+    - [x] compose 示例文件：单服务引用本仓库 GHCR 镜像（`ghcr.io/silevilence/videonote`，按已发布假设书写），仅暴露一个前端端口对外，挂载数据卷并透传 `DEEPSEEK_API_KEY`
+        - 任务描述：示例注明单实例运行（勿横向扩副本共用同一数据库），端口默认 8080 且可配置
+    - [x] 任务描述（本次范围边界）：开发机无 Docker，本任务不做本地构建与启动；镜像构建与推送由后续 CD 负责，本次交付 Dockerfile 与 compose 示例文件
+    - 验收（本机已通过）：Dockerfile 各阶段产物路径、入口命令与 `dotnet publish VideoNote.Server -c Release` 输出一致，构建阶段包含 FFmpeg/FFprobe
+    - 验收（静态核对已通过）：compose 示例只有一个对外端口映射（前端与 API/SignalR 同端口），镜像地址指向本仓库 GHCR 仓库，数据卷覆盖包含数据库与 `keys` 的工作目录，环境变量名称与 `docs/configuration.md` 一致
+    - 验收（待 Docker 环境实测，未通过声明）：本机不执行镜像构建/启动；可构建、可启动、上传→分析→报告主链路可用的验证留待具备 Docker 的环境（后续 CD 或用户自行拉取），未实测前不得宣称该条通过
+    - 交付与验证记录（2026-09-16）：见 [Docker 部署与验证](docs/docker.md)；本项勾选仅表示本次文件交付范围完成，不表示镜像已发布或容器实测通过。
