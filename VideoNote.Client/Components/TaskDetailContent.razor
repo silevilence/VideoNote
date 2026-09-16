@@ -112,6 +112,8 @@ else
         }
     </section>
 
+    <ConversationPanel TaskId="Id" Enabled="@(_task.Status == AnalysisTaskStatus.Completed && !string.IsNullOrWhiteSpace(_task.ResultText))" />
+
     <section class="panel">
         <h2 class="panel-title">分步日志 <span class="chip chip-plain">耗时 @Ui.Elapsed(_task)</span></h2>
         <ol class="task-logs" data-testid="task-logs">

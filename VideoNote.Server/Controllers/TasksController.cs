@@ -15,7 +15,7 @@ namespace VideoNote.Server.Controllers;
 
 [ApiController, Route("api/tasks")]
 public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files, IOptions<UploadOptions> options,
-    AnalysisQueue queue, AnalysisProgressWriter progress) : ControllerBase
+    AnalysisQueue queue, AnalysisProgressWriter progress, VideoNote.Server.Conversation.ConversationRuns conversations) : ControllerBase
 {
     private static TaskDto Dto(AnalysisTask t, bool includeContent = false) => new(t.Id, t.OriginalFileName, t.Mode, t.Status, t.StageDescription, t.CreatedAtUtc, t.ModelConfigId, t.PromptTemplateId, includeContent ? t.PromptContentSnapshot : null,
         t.ProgressPercent, t.ErrorMessage, includeContent ? t.ResultText : null, t.StartedAtUtc, t.CompletedAtUtc, includeContent ? JsonSerializer.Deserialize<List<SegmentResultDto>>(t.SegmentResultsJson) : null,
@@ -114,6 +114,7 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
     {
         var task = await db.AnalysisTasks.FindAsync([id], ct);
         if (task is null) return NotFound();
+        if (conversations.IsActive(id)) return Conflict(new { message = "正在生成对话回复，请停止或等待回复结束后删除。" });
         if (queue.IsActive(id)) return Conflict(new { message = "任务正在退出，请稍后重试删除。" });
         if (task.Status is AnalysisTaskStatus.Preprocessing or AnalysisTaskStatus.Understanding or AnalysisTaskStatus.Combining)
             return Conflict(new { message = "任务正在运行，请先取消。" });

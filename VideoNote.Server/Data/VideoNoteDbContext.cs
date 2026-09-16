@@ -16,9 +16,14 @@ public sealed class VideoNoteDbContext(DbContextOptions<VideoNoteDbContext> opti
     public DbSet<AnalysisTask> AnalysisTasks => Set<AnalysisTask>();
 
     public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
+    public DbSet<ConversationSettings> ConversationSettings => Set<ConversationSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        var settings = modelBuilder.Entity<ConversationSettings>();
+        settings.HasKey(s => s.Id);
+        settings.HasOne(s => s.ModelConfig).WithMany().HasForeignKey(s => s.ModelConfigId).OnDelete(DeleteBehavior.SetNull);
+        settings.HasData(new ConversationSettings());
         var provider = modelBuilder.Entity<Provider>();
         provider.ToTable("Providers");
         provider.HasKey(item => item.Id);

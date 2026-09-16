@@ -17,6 +17,10 @@ builder.Services.AddRazorComponents()
 builder.Services.AddControllers();
 builder.Services.AddSingleton<VideoNote.Server.Configuration.ProviderSecrets>();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<VideoNote.Server.Conversation.ConversationRuns>();
+builder.Services.AddScoped<VideoNote.Server.Conversation.ConversationService>();
+builder.Services.AddOptions<VideoNote.Server.Conversation.ConversationOptions>().BindConfiguration("Conversation")
+    .Validate(o => o.MaxOutputTokens >= 128 && o.RequestTimeoutSeconds > 0, "对话输出上限和超时配置无效。").ValidateOnStart();
 builder.Services.AddOptions<VideoNote.Server.Analysis.AnalysisOptions>().BindConfiguration("Analysis")
     .Validate(o => o.MaxConcurrency == 1, "当前版本仅支持串行分析，MaxConcurrency 必须为 1。").ValidateOnStart();
 builder.Services.AddScoped<VideoNote.Server.Analysis.IMediaPreprocessor, VideoNote.Server.Analysis.MediaPreprocessor>();

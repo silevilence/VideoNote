@@ -1,10 +1,33 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Runtime.CompilerServices;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
+using VideoNote.Shared.Contracts;
 
 namespace VideoNote.Client.Services;
 
 public sealed class ApiClient(HttpClient http)
 {
+    public async IAsyncEnumerable<ConversationEvent> Reply(Guid id, string message, [EnumeratorCancellation] CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/tasks/{id}/conversation")
+            { Content = JsonContent.Create(new ConversationInput { Message = message }) };
+        request.SetBrowserResponseStreamingEnabled(true);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        await EnsureSuccess(response);
+        using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(ct));
+        var done = false;
+        while (await reader.ReadLineAsync(ct) is { } line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var item = JsonSerializer.Deserialize<ConversationEvent>(line, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                ?? throw new InvalidOperationException("对话服务返回空数据。");
+            if (item.Type == "error") throw new InvalidOperationException(item.Text);
+            if (item.Type == "done") done = true;
+            yield return item;
+        }
+        if (!done) throw new InvalidOperationException("对话连接中断，请刷新确认历史后重试。");
+    }
     public async Task<T> Get<T>(string path)
     {
         using var response = await http.GetAsync(path);

@@ -1,0 +1,87 @@
+@implements IDisposable
+@inject VideoNote.Client.Services.ApiClient Api
+@using VideoNote.Shared.Contracts
+@using VideoNote.Shared.Domain
+
+<section class="panel" data-testid="conversation">
+    <h2 class="panel-title">视频问答</h2>
+    @if (!Enabled)
+    {
+        <p class="hint">任务完成并生成报告后可基于视频内容提问。</p>
+    }
+    else
+    {
+        <p class="hint">回答依据完整报告与分段理解。可在<a href="settings">模型设置</a>指定对话模型。</p>
+        <ErrorAlert Message="@error" />
+        @if (loading) { <p role="status">正在加载对话历史…</p> }
+        else if (!loaded) { <button class="btn btn-ghost" @onclick="Load">重新加载历史</button> }
+        else if (history.Count == 0 && !sending) { <p class="hint">还没有对话，试着问“视频的主要观点是什么？”</p> }
+        @foreach (var message in history)
+        {
+            <article class="conversation-message" @key="message.Id">
+                <strong>@(message.Role == ConversationRole.User ? "你" : "视频助手")</strong>
+                <MarkdownContent Text="@message.Content" />
+            </article>
+        }
+        @if (sending)
+        {
+            <article class="conversation-message"><strong>你</strong><p>@pending</p></article>
+            <article class="conversation-message" aria-live="polite" data-testid="conversation-stream">
+                <strong>视频助手 · 生成中</strong>
+                <p style="white-space:pre-wrap;">@(reply.Length == 0 ? "正在思考…" : reply)</p>
+            </article>
+        }
+        <label for="conversation-question">你的问题</label>
+        <textarea id="conversation-question" class="form-control" rows="3" maxlength="8000"
+            disabled="@(sending || !loaded)" @bind="question" @bind:event="oninput"></textarea>
+        <div class="head-actions" style="margin-top:.8rem;">
+            @if (sending) { <button class="btn btn-danger" @onclick="Stop">停止回复</button> }
+            else { <button class="btn btn-primary" disabled="@(!loaded || string.IsNullOrWhiteSpace(question))" @onclick="Send">发送问题</button> }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public Guid TaskId { get; set; }
+    [Parameter] public bool Enabled { get; set; }
+    private List<ConversationMessageDto> history = [];
+    private bool loaded, loading, sending, disposed;
+    private string question = "", reply = "", pending = "";
+    private string? error;
+    private CancellationTokenSource? cancellation;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Enabled && !loaded && !loading && error is null) await Load();
+    }
+    private async Task Load()
+    {
+        loading = true;
+        try { history = await Api.Get<List<ConversationMessageDto>>($"api/tasks/{TaskId}/conversation"); loaded = true; error = null; }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        { error = "对话历史加载失败，请重试。"; }
+        finally { loading = false; }
+    }
+    private async Task Send()
+    {
+        if (sending || !loaded || string.IsNullOrWhiteSpace(question)) return;
+        sending = true; pending = question.Trim(); reply = ""; error = null;
+        cancellation = new();
+        try
+        {
+            await foreach (var item in Api.Reply(TaskId, pending, cancellation.Token))
+            {
+                if (disposed) return;
+                if (item.Type == "delta") reply += item.Text;
+                await InvokeAsync(StateHasChanged);
+            }
+            question = "";
+            await Load();
+        }
+        catch (OperationCanceledException) { error = "已停止回复。未完成的回答不会保存；刷新可确认已完成的历史。"; }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or System.Text.Json.JsonException)
+        { error = ex is InvalidOperationException ? ex.Message : "对话连接失败，请重试。"; }
+        finally { sending = false; cancellation.Dispose(); cancellation = null; reply = ""; }
+    }
+    private void Stop() => cancellation?.Cancel();
+    public void Dispose() { disposed = true; cancellation?.Cancel(); }
+}
