@@ -1,6 +1,9 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Text.Json;
+using VideoNote.Server.AI;
 using VideoNote.Server.Data;
 using VideoNote.Server.Data.Entities;
 using VideoNote.Server.Media;
@@ -20,13 +23,18 @@ internal static class PipelineLiveProbe
         {
             await using var transcription = await ProtocolEndpoint.Start();
             var transcriptionId = Guid.NewGuid();
-            await using var app = new ApiFactory(new()
+            await using var original = new ApiFactory(new()
             {
                 ["Ffmpeg:FramesPerSecond"] = "0.25",
                 ["Transcription:ProviderId"] = transcriptionId.ToString(),
                 ["Pipeline:MaxOutputTokens"] = "2048",
                 ["Pipeline:RequestTimeoutSeconds"] = "240"
             }, runWorker: true);
+            await using var app = original.WithWebHostBuilder(b => b.ConfigureServices(s =>
+            {
+                s.AddSingleton(new HttpClient(new LiveRequestBudget()) { Timeout = Timeout.InfiniteTimeSpan });
+                s.RemoveAll<IModelChatClientFactory>(); s.AddScoped<IModelChatClientFactory, LiveProbeClients>();
+            }));
             using var http = app.CreateClient();
             http.Timeout = TimeSpan.FromMinutes(10);
             var paths = app.Services.GetRequiredService<WorkDirectoryPaths>();
@@ -71,6 +79,16 @@ internal static class PipelineLiveProbe
                         Directory.CreateDirectory("work-tests/live-pipeline");
                         await File.WriteAllTextAsync($"work-tests/live-pipeline/{mode}.md", result.ResultText, timeout.Token);
                         Console.WriteLine($"PASS: DeepSeek {mode}, map calls={result.Segments.Count}, report chars={result.ResultText.Length}");
+                        using var answer = await http.PostAsJsonAsync($"/api/tasks/{task.Id}/conversation",
+                            new ConversationInput { Message = "根据报告与分段理解，用一句中文描述这段视频或字幕的主要内容；如信息不足请明确说明。" }, timeout.Token);
+                        answer.EnsureSuccessStatusCode();
+                        var events = (await answer.Content.ReadAsStringAsync(timeout.Token)).Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(line => JsonSerializer.Deserialize<ConversationEvent>(line, new JsonSerializerOptions(JsonSerializerDefaults.Web))!).ToArray();
+                        if (events.LastOrDefault()?.Type != "done") throw new InvalidOperationException("Conversation did not complete.");
+                        var history = await http.GetFromJsonAsync<List<ConversationMessageDto>>($"/api/tasks/{task.Id}/conversation", timeout.Token);
+                        if (history?.Count != 2 || history[1].Content.Length < 5) throw new InvalidOperationException("Conversation was not persisted.");
+                        await File.WriteAllTextAsync($"work-tests/live-pipeline/{mode}-conversation.md", history[1].Content, timeout.Token);
+                        Console.WriteLine($"PASS: DeepSeek {mode} Agent reply, delta events={events.Count(e => e.Type == "delta")}, persisted messages={history.Count}");
                         break;
                     }
                     await Task.Delay(1000, timeout.Token);

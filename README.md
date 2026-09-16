@@ -84,6 +84,6 @@ dotnet publish VideoNote.Server -c Release -o work-tests/pipeline-publish
 node tests/browser/pipeline.cjs
 ```
 
-脚本启动自己的独立服务（端口 5196）和空数据库，结束后关闭测试进程。真实 DeepSeek 合成物料验收命令为 `dotnet run --project tests/VideoNote.ModelProbe -- --pipeline`，会访问提供商并产生费用。
+脚本启动自己的独立服务（端口 5196）和空数据库，结束后关闭测试进程。真实 DeepSeek 合成物料验收命令为 `dotnet run --project tests/VideoNote.ModelProbe -- --pipeline`，会访问提供商并产生费用。探针关闭 SDK 自动重试，并把实际请求计数保存在 `work-tests/live-pipeline/request-count.txt`，累计最多 20 次；重新验收应先明确新的费用预算。
 
 项目分层：`VideoNote.Client` 为 Blazor WASM 界面，`VideoNote.Server` 承载 API、SignalR、队列和 AI/FFmpeg 服务，`VideoNote.Shared` 提供共享契约和规则。分析采用固定 Map-Reduce 流程，Microsoft.Agents.AI 仅用于完成后的问答。

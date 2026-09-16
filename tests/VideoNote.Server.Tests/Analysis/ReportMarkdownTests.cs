@@ -23,5 +23,8 @@ public sealed class ReportMarkdownTests
     [InlineData("file:///C:/secret")]
     [InlineData("vbscript:boom")]
     public void Unsafe_link_schemes_are_removed(string url)
-        => Assert.DoesNotContain($"href=\"{url}", ReportMarkdown.Render($"[link]({url})"));
+    {
+        Assert.DoesNotContain($"href=\"{url}", ReportMarkdown.Render($"[link]({url})"));
+        Assert.DoesNotContain($"href=\"{url}", ReportMarkdown.Render($"<{url}>"));
+    }
 }

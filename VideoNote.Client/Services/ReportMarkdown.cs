@@ -15,9 +15,13 @@ public static class ReportMarkdown
         {
             // Reports are untrusted model output. No executable schemes or remote image loads.
             link.IsImage = false;
-            if (!Uri.TryCreate(link.Url, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http" or "mailto"))
-                link.Url = "";
+            if (!SafeUrl(link.Url)) link.Url = "";
         }
+        foreach (var link in document.Descendants<AutolinkInline>())
+            if (!link.IsEmail && !SafeUrl(link.Url)) link.Url = "";
         return document.ToHtml(Pipeline);
     }
+
+    private static bool SafeUrl(string? url) => Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        && uri.Scheme is "https" or "http" or "mailto";
 }

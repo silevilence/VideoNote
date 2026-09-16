@@ -40,7 +40,11 @@ public sealed class UploadTests
         await using var input = File.OpenRead(source);
         using var content = new StreamContent(input);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        var response = await client.PostAsync("/api/tasks?mode=Subtitles&modelConfigId=20000000-0000-0000-0000-000000000002&fileName=large.mp4", content);
+        using var multipart = new MultipartFormDataContent();
+        multipart.Add(JsonContent.Create(new CreateTaskInput { FileName = "large.mp4", Mode = VideoNote.Shared.Domain.AnalysisMode.Subtitles,
+            ModelConfigId = Guid.Parse("20000000-0000-0000-0000-000000000002"), PromptContent = "验证流式上传" }), "metadata");
+        multipart.Add(content, "video", "large.mp4");
+        var response = await client.PostAsync("/api/tasks/upload", multipart);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var task = (await response.Content.ReadFromJsonAsync<TaskDto>())!;
         string savedPath;

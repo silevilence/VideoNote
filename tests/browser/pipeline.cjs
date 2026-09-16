@@ -2,12 +2,23 @@ const { chromium } = require('../../work-tests/browser/node_modules/playwright')
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const assert = require('node:assert/strict');
 (async () => {
+ let failTranscription=false, fileCount=0;
  const mock = http.createServer(async (req,res) => {
   let body=''; for await (const chunk of req) body+=chunk;
+  if(req.url==='/upload/v1beta/files') {
+   res.setHeader('X-Goog-Upload-URL','http://127.0.0.1:'+mock.address().port+'/upload-session');res.end('{}');return;
+  }
+  if(req.url==='/upload-session') {
+   const name='files/video'+(++fileCount);
+   res.setHeader('Content-Type','application/json');
+   res.end(JSON.stringify({file:{name,uri:'http://127.0.0.1:'+mock.address().port+'/v1beta/'+name,state:'ACTIVE'}}));return;
+  }
+  if(req.url.startsWith('/v1beta/files/')) {res.end('{}');return;}
   if (req.url.endsWith('/audio/transcriptions')) {
+   if(failTranscription) {res.statusCode=400;res.end('simulated transcription failure');return;}
    res.setHeader('Content-Type','application/json');
    res.end(JSON.stringify({segments:[{start:0,end:1,text:'Synthetic audio evidence.'}]})); return;
   }
@@ -16,6 +27,10 @@ const assert = require('node:assert/strict');
   const chatting=JSON.stringify(parsed).includes('你是视频问答助手');
   const text=chatting?'ANSWER_FROM_VIDEO':report?'# REPORT_READY':'STREAM_BEGIN';
   res.setHeader('Content-Type','text/event-stream');
+  if(req.url.includes('GenerateContent')) {
+   const chunk=(value,finish)=>'data: '+JSON.stringify({candidates:[{content:{role:'model',parts:[{text:value}]},finishReason:finish}],modelVersion:'test'})+'\n\n';
+   res.write(chunk(text,undefined));setTimeout(()=>{if(!res.destroyed)res.end(chunk(' complete.','STOP'));},500);return;
+  }
   const frame=(content,finish=null)=>'data: '+JSON.stringify({id:'test',object:'chat.completion.chunk',created:1,model:'test',
     choices:[{index:0,delta:{role:'assistant',content},finish_reason:finish}]})+'\n\n';
   res.write(frame(text));
@@ -112,7 +127,14 @@ const assert = require('node:assert/strict');
   await page.getByRole('button',{name:'停止回复',exact:true}).click();
   await page.getByRole('button',{name:'发送问题',exact:true}).waitFor();
   assert.equal(await page.locator('.conversation-message').count(),2);
-  console.log('PASS: Agent streaming, persisted history and canceled reply');
+  const historyRoute=base+'/api/tasks/'+taskUrl.split('/').pop()+'/conversation';
+  await page.route(historyRoute,r=>r.fulfill({status:503,contentType:'application/json',body:'{"message":"temporary history failure"}'}));
+  await page.reload();
+  await page.getByText('对话历史加载失败，请重试。',{exact:true}).waitFor();
+  await page.unroute(historyRoute);
+  await page.getByRole('button',{name:'重新加载历史',exact:true}).click();
+  await page.locator('.conversation-message').filter({hasText:'ANSWER_FROM_VIDEO complete.'}).waitFor();
+  console.log('PASS: Agent streaming, persisted history, canceled reply and history retry');
   const currentTaskApi=base+'/api/tasks/'+taskUrl.split('/').pop();
   await page.route(currentTaskApi,r=>r.request().method()==='DELETE' ?
     r.fulfill({status:409,contentType:'application/json',body:'{"message":"audit-delete-conflict"}'}) : r.continue());
@@ -164,6 +186,47 @@ const assert = require('node:assert/strict');
   await page.getByText('对话模型已保存。',{exact:true}).waitFor();
   await page.reload();
   await page.waitForFunction(id=>document.querySelector('#conversation-model')?.value===id,textModel.id);
+  await fetch(base+'/api/settings/conversation',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({modelConfigId:null})});
+  const geminiProvider=await post('/api/providers',{name:'Browser Gemini',protocol:'gemini-native',baseUrl:'http://127.0.0.1:'+mock.address().port+'/v1beta',apiKey:'test-only'});
+  const geminiModel=await post('/api/models',{providerId:geminiProvider.id,modelId:'test-gemini',contextWindow:128000,supportsVideo:true,supportsStreaming:true});
+  for(const [label,id] of [['直接理解',geminiModel.id],['字幕理解',textModel.id]]) {
+   await page.goto(base+'/tasks/new');
+   await page.getByRole('radio').filter({hasText:label}).click();
+   await page.locator('#task-model option[value="'+id+'"]').waitFor({state:'attached'});
+   await page.locator('#task-model').selectOption(id);
+   await page.locator('#video-file').setInputFiles(path.resolve('tests/fixtures/sample.mkv'));
+   await page.getByRole('button',{name:'上传并创建任务'}).click();
+   await page.waitForURL(/\/tasks\/[0-9a-f-]{36}$/);
+   await page.getByTestId('final-report').locator('h1').waitFor({timeout:60000});
+   await page.locator('#conversation-question').fill('这段视频说了什么？');
+   await page.getByRole('button',{name:'发送问题',exact:true}).click();
+   await page.locator('.conversation-message').filter({hasText:'ANSWER_FROM_VIDEO complete.'}).waitFor();
+   await page.reload();
+   await page.locator('.conversation-message').filter({hasText:'ANSWER_FROM_VIDEO complete.'}).waitFor();
+   console.log('PASS: '+label+' browser upload -> progress -> Markdown report -> Agent -> reload');
+  }
+  const silent=path.resolve('work-tests/browser/silent.mp4');
+  assert.equal(spawnSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-f','lavfi','-i','color=red:size=64x64:rate=1:duration=1','-an','-c:v','libx264',silent],{windowsHide:true}).status,0);
+  for(const [label,id,file,expected] of [['字幕理解',textModel.id,silent,'视频没有可用软字幕，也没有可转写的音轨。'],['抽帧理解',model.id,path.resolve('tests/fixtures/sample.mkv'),'转写端点返回 HTTP 400']]) {
+   failTranscription=label==='抽帧理解';
+   await page.goto(base+'/tasks/new');
+   await page.getByRole('radio').filter({hasText:label}).click();
+   await page.locator('#task-model').selectOption(id);
+   await page.locator('#video-file').setInputFiles(file);
+   await page.getByRole('button',{name:'上传并创建任务'}).click();
+   await page.waitForURL(/\/tasks\/[0-9a-f-]{36}$/);
+   await page.getByText(expected,{exact:false}).waitFor({timeout:30000});
+   assert.equal(await page.locator('#conversation-question').count(),0);
+  }
+  failTranscription=false;
+  await page.route(base+'/api/models',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify([textModel])}));
+  await page.goto(base+'/tasks/new');
+  await page.getByText('当前模式没有匹配模型；',{exact:false}).waitFor();
+  await page.locator('#video-file').setInputFiles(silent);
+  await page.getByRole('button',{name:'上传并创建任务'}).click();
+  await page.getByText('请选择分析模型。',{exact:true}).waitFor();
+  await page.unroute(base+'/api/models');
+  console.log('PASS: no subtitles/audio, transcription failure, missing model and disabled chat');
   assert.deepEqual(errors,[]);
   console.log('PASS: browser upload -> live map text -> final report -> reload persistence; list updates and cancellation; desktop/mobile screenshots');
  } finally {

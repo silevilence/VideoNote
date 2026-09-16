@@ -11,6 +11,8 @@ const assert = require('node:assert/strict');
  await page.locator('#video-file').setInputFiles(path.resolve('tests/fixtures/subtitles.srt'));
  await page.getByRole('button',{name:'上传并创建任务'}).click();
  await page.getByText('视频扩展名不受支持。',{exact:true}).waitFor();
+ await page.locator('#task-model option[value="20000000-0000-0000-0000-000000000002"]').waitFor({state:'attached'});
+ await page.locator('#task-model').selectOption('20000000-0000-0000-0000-000000000002');
  await page.locator('#video-file').setInputFiles(path.resolve('work-tests/large.mp4'));
  await page.getByRole('button',{name:'上传并创建任务'}).click();
  await page.waitForURL(/\/tasks\/[0-9a-f-]{36}$/, {timeout:120000});

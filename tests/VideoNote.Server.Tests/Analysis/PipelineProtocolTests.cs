@@ -66,6 +66,11 @@ public sealed class PipelineProtocolTests
         if (audio) Assert.Contains(mock.Bodies, b => b.Contains("audio"));
         var reloaded = await http.GetFromJsonAsync<TaskDto>($"/api/tasks/{task.Id}");
         Assert.Equal(done.Segments, reloaded!.Segments);
+        var conversation = await ConversationTests.Ask(http, task.Id, "请根据视频报告回答主要内容。");
+        Assert.Equal("done", conversation[^1].Type);
+        Assert.Contains(conversation, e => e.Type == "delta" && e.Text!.Contains("PIPELINE_OK"));
+        Assert.Equal(2, (await http.GetFromJsonAsync<List<ConversationMessageDto>>($"api/tasks/{task.Id}/conversation"))!.Count);
+        Assert.Equal(expectedMaps + 2, mock.ChatCalls);
     }
     internal static async Task<Guid> Seed(IServiceProvider services, string url, bool gemini, bool audio = false)
     {

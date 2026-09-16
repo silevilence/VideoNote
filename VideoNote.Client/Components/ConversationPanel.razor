@@ -58,7 +58,7 @@
         loading = true;
         try { history = await Api.Get<List<ConversationMessageDto>>($"api/tasks/{TaskId}/conversation"); loaded = true; error = null; }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
-        { error = "对话历史加载失败，请重试。"; }
+        { loaded = false; error = "对话历史加载失败，请重试。"; }
         finally { loading = false; }
     }
     private async Task Send()

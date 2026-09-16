@@ -25,6 +25,8 @@
 <ErrorAlert Message="@Error" />
 <ErrorAlert Message="@uploadError" />
 <NoticeAlert Message="@Notice" />
+@if (Busy) { <p class="loading-line" role="status">正在加载模型、模板和上传限制…</p> }
+@if (Error is not null) { <button class="btn btn-ghost" disabled="@Busy" @onclick="() => Run(Load)">重新加载创建配置</button> }
 
 <div class="panel">
     <h2 class="panel-title">
