@@ -39,7 +39,10 @@ gh release view V0.1.0
 
 - `python -m unittest discover -s tests/release-tests -v`：5 组回归全部通过（含多个 tag 与无效段落子用例）；真实 `V0.1.0` 提取成功，`V9.9.9` 退出码 1 且指出缺失版本。
 - `actionlint 1.7.12` 工作流语法校验通过（未安装 ShellCheck/Pyflakes，关闭这两项外部检查）；`git diff --check` 通过，Dockerfile 与 compose.yaml 无改动。
-- 远端 `V0.1.0` 推送及实际结果待记录。
+- 已推送 `main` 与 `V0.1.0`，发布提交为 `078893258ae7c782289b9cca6bd7c857065f32dc`。[Actions 运行 35067137232](https://github.com/silevilence/VideoNote/actions/runs/35067137232) 于 2026-09-16 07:11 UTC 成功完成：tag 触发 → changelog 校验 → 构建 → GHCR 登录 → 推送 → Release 创建，全部步骤成功。
+- 镜像为 `ghcr.io/silevilence/videonote:0.1.0`（Linux amd64），推送摘要为 `sha256:ad38374c55f9e55742004154808b611d752f6c2d6aacdb784e1fdb20bde63fe4`。Dockerfile 中 FFmpeg 合成视频、`stats_mux_pre` 与 FFprobe 自检成功，日志输出 H.264 与 AAC 编码。
+- 匿名请求 GHCR `0.1.0` manifest 返回 HTTP 200，摘要与推送日志一致；这是注册表元数据访问验证，没有下载镜像层或启动容器。
+- [V0.1.0 Release](https://github.com/silevilence/VideoNote/releases/tag/V0.1.0) 已正式发布（非草稿、非预发布），通过 API 读取正文并与本地提取结果比较，一致。
 - 本机无 Docker；容器启动、Compose 拉取与容器内分析/对话主链路未验证。本次发布任务不调用真实模型。
 
 工作流语法与权限依据：[GitHub Actions 工作流语法](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)、[发布 Docker 镜像](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)、[gh release create](https://cli.github.com/manual/gh_release_create)。

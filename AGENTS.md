@@ -8,7 +8,7 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 
 项目已完成三层架构、提供商/模型/提示词管理、流式上传、后台队列、三种模式预处理、分段理解与报告组合。新建页支持本次任务提示词内联快照并要求选择模型；列表/详情提供实时进度、耗时、持久化分步日志、安全 Markdown 报告与取消。完成任务可通过 Microsoft.Agents.AI 单 Assistant Agent 进行流式问答，成功问答成对保存，设置页可指定全局对话模型。
 
-仓库根目录已交付容器部署文件 `Dockerfile`、`.dockerignore`、`compose.yaml` 与说明 `docs/docker.md`。本机无 Docker，只完成发布产物与静态配置核对；镜像构建、容器启动及容器内主链路未实测，不得宣称通过。
+仓库根目录已交付容器部署文件 `Dockerfile`、`.dockerignore`、`compose.yaml` 与说明 `docs/docker.md`。本机无 Docker；`V0.1.0` 已在 GitHub Actions 完成 Linux amd64 镜像构建（含 FFmpeg 自检）、GHCR 推送与 Release 创建，证据见 `docs/release.md`。容器启动及容器内主链路未实测，不得宣称通过。
 
 版本为 `0.1.0`：应用版本声明在 `VideoNote.Server/VideoNote.Server.csproj`，用户可见变更记录在 `changelog.md`。版本 Tag 自动发布已实现在 `.github/workflows/release.yml`：推送 `V0.1.0` 形态 tag → 从 changelog 提取对应版本段落，缺失即失败 → 推送 GHCR 镜像 → 创建 Release。仅使用 `GITHUB_TOKEN`，本机可运行 `python -m unittest discover -s tests/release-tests -v` 验证发布说明校验；真实发布验收状态见 `docs/release.md`。
 
@@ -59,7 +59,7 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 
 - Windows 11；.NET SDK 10.0.301（另有 6.0/8.0/9.0）
 - FFmpeg 7.1.1（gyan.dev full build）已在 PATH
-- Docker 不可用；Docker 任务在本机仅验证发布产物与配置文件，不执行镜像构建/启动。容器构建、启动和主链路实测留待具备 Docker 的环境，未实测不得宣称通过。
+- Docker 不可用；Docker 任务在本机仅验证发布产物与配置文件，不执行镜像构建/启动。镜像构建已由 GitHub Actions 验证；容器启动和主链路实测仍留待具备 Docker 的环境，未实测不得宣称通过。
 - VS Code 从仓库根目录按 F5：先构建 Server 项目，再使用现有 `http` 启动配置运行并打开浏览器；工作目录为 `VideoNote.Server`。
 
 ## 开发约定

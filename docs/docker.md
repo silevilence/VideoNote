@@ -5,7 +5,7 @@
 ## 镜像与运行约定
 
 - 构建上下文为仓库根目录。SDK 阶段使用 `10.0.301-noble`，与 `global.json` 一致，先还原三个应用项目，再将 Server 发布到 `/out`；最终阶段将完整发布目录复制到 `/app`，以 `dotnet VideoNote.Server.dll` 启动。
-- 运行镜像使用官方 .NET 10 ASP.NET Core Ubuntu Noble 镜像。通过发行版包管理器安装 FFmpeg 及其动态库和 FFprobe；镜像构建时运行一个小型合成音视频检查，验证 `libx264`、AAC、`stats_mux_pre` 和 FFprobe。该检查尚未在本机执行。
+- 运行镜像使用官方 .NET 10 ASP.NET Core Ubuntu Noble 镜像。通过发行版包管理器安装 FFmpeg 及其动态库和 FFprobe；镜像构建时运行一个小型合成音视频检查，验证 `libx264`、AAC、`stats_mux_pre` 和 FFprobe。该检查已在 `V0.1.0` GitHub Actions 构建中通过，本机没有执行。
 - 单个 ASP.NET Core 主进程提供 WASM 静态资源、REST API 和 SignalR，监听容器 HTTP 8080；媒体处理按需启动 FFmpeg/FFprobe 子进程。镜像不内置反向代理。
 - 默认以官方镜像的 `app` 用户运行。镜像预建并授权 `/app/work`，首次使用空命名卷时沿用该目录权限。若改为宿主机目录绑定挂载，须由部署者预先赋予 `app` 的 UID/GID（官方 Noble 镜像为 1654:1654）读写权限；不能以符号链接替代物料目录。
 - `Storage__RootPath=work` 相对于内容根 `/app` 解析；`ConnectionStrings__VideoNote=Data Source=videonote.db` 相对于工作目录解析。挂载整个 `/app/work`，而不是只挂载数据库文件：它同时包含 `videonote.db`、SQLite 辅助文件、`keys/`、`videos/`、`frames/`、`audio/`、`subtitles/`。
@@ -67,7 +67,11 @@ Compose 固定项目名称为 `videonote`，默认创建命名卷 `videonote_vid
 - 对两个基础镜像标签执行 MCR manifest HEAD 请求，均返回 HTTP 200；这只验证标签存在，没有拉取镜像。
 - `git diff --check` 通过。本次未改应用逻辑，未调用真实模型；未执行 Docker 构建、启动、Compose CLI 校验、GHCR 发布或容器主链路验收。
 
-## 后续 Docker 环境验收（未执行）
+## 远端构建与发布验证（2026-09-16）
+
+`V0.1.0` 的 [Actions 运行](https://github.com/silevilence/VideoNote/actions/runs/35067137232) 已完成 Linux amd64 镜像构建、FFmpeg 合成物料自检、GHCR `0.1.0` 推送与 Release 创建。镜像摘要与发布说明核对见[发布记录](release.md)。以下容器启动、Compose 与应用主链路步骤仍未执行。
+
+## 后续 Docker 运行环境验收（未执行）
 
 在仓库根目录执行构建并检查镜像依赖：
 

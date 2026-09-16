@@ -4,19 +4,19 @@
 
 ## 🚧 开发中 (In Progress)
 
-- [ ] **版本 Tag 自动发布**（推送版本 tag 触发 Actions：GHCR 镜像 + Release）
+## ✅ 已完成 (Completed)
+
+- [x] **版本 Tag 自动发布**（推送版本 tag 触发 Actions：GHCR 镜像 + Release）
     - [x] 触发条件：推送形如 `V0.1.0` 的版本 tag 时自动发布，大小写不敏感（`v0.1.0` 与 `V0.1.0` 同等处理）；非版本 tag 不触发
         - 任务描述：依赖前一条任务的 Dockerfile；`changelog.md` 已纳入版本库。发布范围为三段数字正式版（不含预发布后缀），镜像平台为 `linux/amd64`。
     - [x] 更新记录校验：从仓库 `changelog.md` 提取与 tag 版本号对应的版本段落（忽略大小写，格式参考现有 `## V0.1.0` 段落），提取不到时流程立即失败，不构建镜像、不发布 Release，失败信息指明缺失的版本号
-    - [ ] 镜像构建推送：构建 Dockerfile 镜像并推送到本仓库 GHCR（`ghcr.io/silevilence/videonote`），至少包含与 tag 对应的版本标签（去掉 `v` 前缀），仓库地址与 compose 示例保持一致
-    - [ ] 发布 Release：以 tag 为版本、以 `changelog.md` 中该版本段落为说明创建 GitHub Release，仅使用 `GITHUB_TOKEN`，不引入额外密钥
+    - [x] 镜像构建推送：构建 Dockerfile 镜像并推送到本仓库 GHCR（`ghcr.io/silevilence/videonote`），至少包含与 tag 对应的版本标签（去掉 `v` 前缀），仓库地址与 compose 示例保持一致
+    - [x] 发布 Release：以 tag 为版本、以 `changelog.md` 中该版本段落为说明创建 GitHub Release，仅使用 `GITHUB_TOKEN`，不引入额外密钥
     - 验收：以现有 `changelog.md` 的 `V0.1.0` 段落为样例，可提取出该版本记录；改用不存在的版本号时校验以非零码退出（两步均不依赖 Docker，可在本机复现）
     - 验收：流水线顺序为「校验更新记录 → 构建推送镜像 → 创建 Release」，校验失败时后续步骤不执行
     - 验收：镜像地址、标签与端口约定与 compose 示例一致；不修改 Dockerfile 与 compose 示例内容
     - 验收：真实触发需推送 tag 并具备 Actions/GHCR 环境，未实测前不得宣称通过
-    - 实现：`.github/workflows/release.yml`、`scripts/release-notes.py`；本地回归与远端发布证据见 `docs/release.md`。构建推送与 Release 勾选待真实 tag 验收。
-
-## ✅ 已完成 (Completed)
+    - 实现：`.github/workflows/release.yml`、`scripts/release-notes.py`；本地回归与远端发布证据见 `docs/release.md`。2026-09-16 已推送 V0.1.0，Actions 35067137232 全部成功，镜像与 Release 发布通过。
 
 - [x] **搭建解决方案骨架**（Blazor Web App + 分层类库 + 基础设施就绪）
     - [x] 使用 Blazor Web App 模板（.NET 10，Interactive WebAssembly render mode）创建项目
