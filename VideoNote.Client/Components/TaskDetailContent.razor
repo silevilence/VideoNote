@@ -77,11 +77,11 @@ else
                     <span class="chip chip-plain">耗时 @Ui.Elapsed(_task)</span>
                 </h2>
                 <div class="stagestrip" aria-hidden="true">
-                    @for (var i = 0; i < StageNames.Length; i++)
+                    @foreach (var stage in StageDots)
                     {
-                        <div class="stage @StageClass(i)">
+                        <div class="stage @stage.State">
                             <span class="stage-dot"></span>
-                            <span>@StageNames[i]</span>
+                            <span>@stage.Name</span>
                         </div>
                     }
                 </div>
@@ -228,14 +228,29 @@ else
         _ => -1
     };
 
-    private string StageClass(int index)
+    private sealed record StageDot(string Name, string State);
+
+    /// <summary>阶段条节点：失败/取消任务在末尾追加终态节点，明确处理已停止。</summary>
+    private StageDot[] StageDots
     {
-        if (_task is null) return "";
-        if (_task.Status == AnalysisTaskStatus.Completed) return "is-done";
-        var order = StageOrder(_task.Status);
-        if (index < order) return "is-done";
-        if (index == order) return "is-now";
-        return "";
+        get
+        {
+            if (_task is null) return [];
+            var order = StageOrder(_task.Status);
+            var dots = new List<StageDot>(StageNames.Length + 1);
+            for (var i = 0; i < StageNames.Length; i++)
+            {
+                string state;
+                if (_task.Status == AnalysisTaskStatus.Completed) state = "is-done";
+                else if (i < order) state = "is-done";
+                else if (i == order) state = "is-now";
+                else state = "";
+                dots.Add(new StageDot(StageNames[i], state));
+            }
+            if (_task.Status == AnalysisTaskStatus.Failed) dots.Add(new StageDot("中止", "is-halt"));
+            if (_task.Status == AnalysisTaskStatus.Canceled) dots.Add(new StageDot("中止", "is-stopped"));
+            return [.. dots];
+        }
     }
 
     private string StageFallback => _task is null ? "暂无阶段信息" : _task.Status switch

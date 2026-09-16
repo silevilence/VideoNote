@@ -57,7 +57,7 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 ## 验证与维护
 
 - `dotnet test tests/VideoNote.Server.Tests --collect "XPlat Code Coverage" --settings tests/coverage.runsettings`：独立工作目录、本地协议端点和真实 FFmpeg；包含 125 秒延迟回归，不需要真实模型密钥。
-- `dotnet publish VideoNote.Server -c Release -o work-tests/pipeline-publish` 后运行 `node tests/browser/pipeline.cjs`：依赖 `work-tests/browser/node_modules/playwright` 和 Edge，脚本只管理自己的测试进程。
+- `dotnet publish VideoNote.Server -c Release -o work-tests/pipeline-publish` 后运行 `node tests/browser/pipeline.cjs`：依赖 `work-tests/browser/node_modules/playwright`、Edge 与 PATH 中的 ffmpeg（脚本用 ffmpeg 合成无声样例视频），脚本只管理自己的测试进程。
 - 单实例运行；分析及对话请求准入、删除复用 AnalysisQueue.Gate。不要让多实例共用数据库。
 - multipart 上传必须使用 StreamingUploadAttribute 禁用 MVC 的自动表单读取；不得使用 IFormFile 缓冲视频。
 - 模型输出视为不可信数据；Markdown 禁止原始 HTML 与危险链接协议。错误与日志不得包含提供商密钥或上游原始响应。

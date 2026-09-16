@@ -69,7 +69,7 @@
         </section>
 
         <section class="step @StepClass(1)">
-            <span class="step-no" aria-hidden="true">2</span>
+            <span class="step-no" aria-hidden="true">@(StepDone(1) ? "✓" : "2")</span>
             <div class="panel step-body">
                 <h2 class="panel-title">
                     <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.2"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 7h5M17 17h5"/></svg>
@@ -219,12 +219,18 @@
     private ModelDto? SelectedModel => models.FirstOrDefault(m => m.Id.ToString() == modelId);
     private PromptDto? SelectedPrompt => prompts.FirstOrDefault(p => p.Id.ToString() == promptId);
 
-    /// <summary>文件存在的问题；null 表示已选文件合法（或限制未加载，交由提交校验兜底）。</summary>
-    private string? FileProblem => selected is null or { Size: 0 } ? null
-        : limits is null ? null
-        : selected.Size > limits.MaxBytes ? "超过大小上限"
-        : !limits.AllowedExtensions.Contains(Path.GetExtension(selected.Name), StringComparer.OrdinalIgnoreCase) ? "扩展名不受支持"
-        : null;
+    /// <summary>所选文件的大小问题；null 表示合法（或限制未加载，交由提交校验兜底）。</summary>
+    private string? SizeProblemFor(long size) => limits is null ? null
+        : size == 0 ? "文件为空"
+        : size > limits.MaxBytes ? "超过大小上限" : null;
+
+    private string? ExtProblemFor(string name) => limits is null ? null
+        : !limits.AllowedExtensions.Contains(Path.GetExtension(name), StringComparer.OrdinalIgnoreCase) ? "扩展名不受支持" : null;
+
+    /// <summary>文件校验唯一来源：场记单清单、步骤完成态与提交校验共用。</summary>
+    private string? FileProblemFor(string name, long size) => SizeProblemFor(size) ?? ExtProblemFor(name);
+
+    private string? FileProblem => selected is { } file ? FileProblemFor(file.Name, file.Size) : null;
 
     private bool StepDone(int step) => step switch
     {
@@ -235,26 +241,47 @@
 
     private int CurrentStep => StepDone(0) ? (StepDone(2) ? -1 : 2) : 0;
 
-    private string StepClass(int step) => StepDone(step) ? (CurrentStep == step ? "is-current" : "is-done") : "is-current";
+    /// <summary>已完成步骤标 is-done；仅第一个未完成步骤标 is-current，保证唯一引导焦点。</summary>
+    private string StepClass(int step)
+    {
+        if (StepDone(step)) return "is-done";
+        return CurrentStep == step ? "is-current" : "";
+    }
 
     private sealed record CheckItem(string State, string Text, string? Reason);
 
-    private CheckItem[] Checks =>
-    [
-        limits is null
-            ? new CheckItem("", "视频文件", "正在加载上传限制")
-            : selected is null
-                ? new CheckItem("is-fail", "视频文件", "尚未选择")
-                : FileProblem is { } problem
-                    ? new CheckItem("is-fail", "视频文件", problem)
-                    : new CheckItem("is-pass", "视频文件", $"{selected!.Name} · {Ui.Size(selected.Size)}"),
-        SelectedModel is { } model
-            ? new CheckItem("is-pass", "分析模型", model.ModelId)
-            : new CheckItem("is-fail", "分析模型", "尚未选择"),
-        promptContent.Length > 16000
-            ? new CheckItem("is-fail", "提示词", "超过 16000 字符")
-            : new CheckItem("is-pass", "提示词", $"{promptContent.Length} / 16000 字符")
-    ];
+    /// <summary>场记单校验清单：视频文件、扩展名、大小、分析模型、提示词逐项状态。</summary>
+    private CheckItem[] Checks
+    {
+        get
+        {
+            CheckItem[] fileChecks;
+            if (limits is null)
+            {
+                fileChecks = [new("", "视频文件", "正在加载上传限制"), new("", "扩展名", "等待上传限制"), new("", "大小", "等待上传限制")];
+            }
+            else if (selected is not { } file)
+            {
+                fileChecks = [new("is-fail", "视频文件", "尚未选择"), new("", "扩展名", "待选择文件"), new("", "大小", "待选择文件")];
+            }
+            else
+            {
+                fileChecks =
+                [
+                    new("is-pass", "视频文件", $"{file.Name} · {Ui.Size(file.Size)}"),
+                    ExtProblemFor(file.Name) is { } extProblem ? new("is-fail", "扩展名", extProblem) : new("is-pass", "扩展名", Path.GetExtension(file.Name)),
+                    SizeProblemFor(file.Size) is { } sizeProblem ? new("is-fail", "大小", sizeProblem) : new("is-pass", "大小", $"{Ui.Size(file.Size)} / {Ui.Size(limits.MaxBytes)}")
+                ];
+            }
+            return [.. fileChecks,
+                SelectedModel is { } model
+                    ? new CheckItem("is-pass", "分析模型", model.ModelId)
+                    : new CheckItem("is-fail", "分析模型", "尚未选择"),
+                promptContent.Length > 16000
+                    ? new CheckItem("is-fail", "提示词", "超过 16000 字符")
+                    : new CheckItem("is-pass", "提示词", $"{promptContent.Length} / 16000 字符")];
+        }
+    }
 
     protected override Task OnInitializedAsync() => Run(Load);
 
@@ -312,10 +339,9 @@
         {
             var file = selected ?? await module.InvokeAsync<SelectedFile?>("selectedFile", fileInput);
             if (file is null) { uploadError = "请先选择视频。"; return; }
-            if (file.Size == 0 || file.Size > limits!.MaxBytes) { uploadError = "文件为空或超过上传大小上限。"; return; }
-            if (!limits.AllowedExtensions.Contains(Path.GetExtension(file.Name), StringComparer.OrdinalIgnoreCase))
+            if (FileProblemFor(file.Name, file.Size) is { } problem)
             {
-                uploadError = "视频扩展名不受支持。";
+                uploadError = problem == "扩展名不受支持" ? "视频扩展名不受支持。" : "文件为空或超过上传大小上限。";
                 return;
             }
             if (SelectedModel is null) { uploadError = "请选择分析模型。"; return; }

@@ -975,7 +975,7 @@ textarea.form-control { resize: vertical; min-height: 2.5rem; }
 .markdown-content pre { overflow-x: auto; padding: 1rem; background: rgba(127,127,127,.1); border-radius: 8px; }
 .markdown-content code { font-size: .9em; }
 .markdown-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
-.markdown-content th, .markdown-content td { border: 1px solid var(--border); padding: .5rem; }
+.markdown-content th, .markdown-content td { border: 1px solid var(--line); padding: .5rem; }
 .markdown-content blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid #b58751; }
 .task-logs { padding-left: 1.4rem; }
 .task-logs li { padding: .3rem 0; }
@@ -1205,6 +1205,9 @@ textarea.form-control { resize: vertical; min-height: 2.5rem; }
 
 .stage.is-halt { color: #f0917f; }
 .stage.is-halt .stage-dot { border-color: rgba(226, 96, 79, 0.6); background: var(--red-dim); }
+
+.stage.is-stopped { color: var(--ink-2); }
+.stage.is-stopped .stage-dot { border-color: rgba(139, 148, 169, 0.6); background: var(--slate-dim); }
 
 .stagestrip-meta { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.55rem; }
 .stagestrip-meta .desc { color: var(--ink-2); font-size: 0.9rem; }

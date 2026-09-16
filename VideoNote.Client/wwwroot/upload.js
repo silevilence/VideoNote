@@ -39,9 +39,14 @@ export function selectedFile(input) {
 }
 export function clearFile(input) { input.value = ""; }
 export function attachDropzone(zone, input, receiver) {
-    if (!zone || zone.dataset.wired) return;
+    if (!zone) return;
+    // input 在选片卡片与拖放区之间被复用，change 监听只挂一次；拖放监听挂在被重建的 zone 上。
+    if (!input.dataset.wired) {
+        input.dataset.wired = "1";
+        input.addEventListener("change", () => receiver?.invokeMethodAsync("FilePicked").catch(() => {}));
+    }
+    if (zone.dataset.wired) return;
     zone.dataset.wired = "1";
-    const notify = () => receiver?.invokeMethodAsync("FilePicked").catch(() => {});
     zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("is-over"); });
     zone.addEventListener("dragleave", () => zone.classList.remove("is-over"));
     zone.addEventListener("drop", e => {
@@ -49,8 +54,7 @@ export function attachDropzone(zone, input, receiver) {
         zone.classList.remove("is-over");
         if (e.dataTransfer?.files?.length) {
             input.files = e.dataTransfer.files;
-            notify();
+            receiver?.invokeMethodAsync("FilePicked").catch(() => {});
         }
     });
-    input.addEventListener("change", notify);
 }
