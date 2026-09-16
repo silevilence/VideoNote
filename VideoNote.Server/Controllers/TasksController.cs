@@ -18,7 +18,8 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
     AnalysisQueue queue, AnalysisProgressWriter progress) : ControllerBase
 {
     private static TaskDto Dto(AnalysisTask t, bool includeContent = false) => new(t.Id, t.OriginalFileName, t.Mode, t.Status, t.StageDescription, t.CreatedAtUtc, t.ModelConfigId, t.PromptTemplateId, includeContent ? t.PromptContentSnapshot : null,
-        t.ProgressPercent, t.ErrorMessage, includeContent ? t.ResultText : null, t.StartedAtUtc, t.CompletedAtUtc, includeContent ? System.Text.Json.JsonSerializer.Deserialize<List<SegmentResultDto>>(t.SegmentResultsJson) : null);
+        t.ProgressPercent, t.ErrorMessage, includeContent ? t.ResultText : null, t.StartedAtUtc, t.CompletedAtUtc, includeContent ? JsonSerializer.Deserialize<List<SegmentResultDto>>(t.SegmentResultsJson) : null,
+        includeContent ? JsonSerializer.Deserialize<List<TaskLogDto>>(t.LogsJson) : null);
     [HttpGet("upload-limits")]
     public UploadLimitsDto Limits() => new(options.Value.MaxBytes, options.Value.AllowedExtensions);
 

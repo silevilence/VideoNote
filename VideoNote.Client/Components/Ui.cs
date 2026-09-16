@@ -75,5 +75,12 @@ public static class Ui
         _ => $"{bytes} B"
     };
 
+    public static string Elapsed(TaskDto task)
+    {
+        if (task.StartedAtUtc is not { } start) return "—";
+        var duration = (task.CompletedAtUtc ?? DateTime.UtcNow) - start;
+        return $"{Math.Max(0, (int)duration.TotalHours):00}:{Math.Max(0, duration.Minutes):00}:{Math.Max(0, duration.Seconds):00}";
+    }
+
     public static string Time(DateTime utc) => utc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 }

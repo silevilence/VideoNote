@@ -1,0 +1,13 @@
+@using VideoNote.Client.Services
+<div class="markdown-content">@((MarkupString)html)</div>
+@code {
+    [Parameter] public string Text { get; set; } = "";
+    private string? previous;
+    private string html = "";
+    protected override void OnParametersSet()
+    {
+        if (previous == Text) return;
+        previous = Text;
+        html = ReportMarkdown.Render(Text);
+    }
+}

@@ -99,7 +99,7 @@ else
         </h2>
         @if (!string.IsNullOrEmpty(_task.ResultText))
         {
-            <div class="preview-box" data-testid="final-report"><pre>@_task.ResultText</pre></div>
+            <div data-testid="final-report"><MarkdownContent Text="@_task.ResultText" /></div>
         }
         else if (_report.Length > 0)
         {
@@ -110,6 +110,18 @@ else
         {
             <p class="dim">@(Ui.IsActive(_task.Status) ? "分析完成后显示最终报告，生成时实时展示。" : "此任务未生成报告。")</p>
         }
+    </section>
+
+    <section class="panel">
+        <h2 class="panel-title">分步日志 <span class="chip chip-plain">耗时 @Ui.Elapsed(_task)</span></h2>
+        <ol class="task-logs" data-testid="task-logs">
+            @foreach (var entry in _task.Logs ?? [])
+            {
+                <li><time class="mono small">@entry.AtUtc.ToLocalTime().ToString("HH:mm:ss")</time>
+                    <span>@entry.Description · @entry.ProgressPercent%</span></li>
+            }
+        </ol>
+        @if (_task.Logs is not { Count: > 0 }) { <p class="hint">@(_task.Status == AnalysisTaskStatus.Queued ? "排队等待分析" : "此历史任务没有保存分步日志。")</p> }
     </section>
 
     <section class="panel">

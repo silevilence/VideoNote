@@ -21,5 +21,6 @@ public sealed class SegmentMigrationTests
             """);
         await migrator.MigrateAsync();
         Assert.Equal("[]", (await db.AnalysisTasks.SingleAsync()).SegmentResultsJson);
+        Assert.Equal("[]", (await db.AnalysisTasks.SingleAsync()).LogsJson);
     }
 }

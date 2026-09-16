@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
   }
   const parsed=JSON.parse(body);
   const report=JSON.stringify(parsed).includes('依据全部分段笔记');
-  const text=report?'REPORT_READY':'STREAM_BEGIN';
+  const text=report?'# REPORT_READY':'STREAM_BEGIN';
   res.setHeader('Content-Type','text/event-stream');
   const frame=(content,finish=null)=>'data: '+JSON.stringify({id:'test',object:'chat.completion.chunk',created:1,model:'test',
     choices:[{index:0,delta:{role:'assistant',content},finish_reason:finish}]})+'\n\n';
@@ -72,6 +72,8 @@ const assert = require('node:assert/strict');
   await page.screenshot({path:'work-tests/browser/pipeline-stream.png',fullPage:true});
   await page.getByTestId('final-report').filter({hasText:'REPORT_READY complete.'}).waitFor({timeout:30000});
   await page.getByText('请用 Markdown 汇总。INLINE_SNAPSHOT',{exact:true}).waitFor();
+  await page.getByTestId('final-report').locator('h1').waitFor();
+  assert.ok((await page.getByTestId('task-logs').locator('li').count()) >= 4);
   const taskUrl=page.url();
   await page.reload();
 

@@ -23,6 +23,7 @@ public sealed class AnalysisTask
     public string? ResultText { get; set; }
 
     public string SegmentResultsJson { get; set; } = "[]";
+    public string LogsJson { get; set; } = "[]";
 
     public string? ErrorMessage { get; set; }
 

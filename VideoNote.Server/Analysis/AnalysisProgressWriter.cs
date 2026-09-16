@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
+using System.Text.Json;
+using VideoNote.Server.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using VideoNote.Server.Data;
 using VideoNote.Server.Realtime;
@@ -31,6 +33,7 @@ public sealed class AnalysisProgressWriter(IServiceScopeFactory scopes, Analysis
             if (status == AnalysisTaskStatus.Preprocessing) task.StartedAtUtc ??= DateTime.UtcNow;
             if (Terminal(status)) task.CompletedAtUtc = DateTime.UtcNow;
             if (result is not null) task.ResultText = result;
+            AppendLog(task);
             await db.SaveChangesAsync(ct);
             // Preserve event order with cancellation; transport waiting is bounded.
             await NotifyAsync(id, "AnalysisProgress", new AnalysisProgress(id, status, task.ProgressPercent, description, error), ct);
@@ -51,6 +54,7 @@ public sealed class AnalysisProgressWriter(IServiceScopeFactory scopes, Analysis
             task.Status = AnalysisTaskStatus.Canceled;
             task.StageDescription = "已取消";
             task.CompletedAtUtc = DateTime.UtcNow;
+            AppendLog(task);
             await db.SaveChangesAsync(ct);
             queue.Cancel(id);
             await NotifyAsync(id, "AnalysisProgress",
@@ -62,6 +66,16 @@ public sealed class AnalysisProgressWriter(IServiceScopeFactory scopes, Analysis
 
     public Task TextAsync(Guid id, string stage, int segment, string text, CancellationToken ct) =>
         NotifyAsync(id, "AnalysisText", new AnalysisText(id, stage, segment, text), ct);
+
+    private static void AppendLog(AnalysisTask task)
+    {
+        var logs = JsonSerializer.Deserialize<List<TaskLogDto>>(task.LogsJson) ?? [];
+        if (logs.Count == 0) logs.Add(new(task.CreatedAtUtc, AnalysisTaskStatus.Queued, 0, "排队等待分析"));
+        var entry = new TaskLogDto(DateTime.UtcNow, task.Status, task.ProgressPercent, task.StageDescription ?? "");
+        if (logs[^1].Status != entry.Status || logs[^1].Description != entry.Description || logs[^1].ProgressPercent != entry.ProgressPercent)
+            logs.Add(entry);
+        task.LogsJson = JsonSerializer.Serialize(logs);
+    }
 
     private async Task NotifyAsync(Guid id, string method, object message, CancellationToken ct)
     {

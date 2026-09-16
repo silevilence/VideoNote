@@ -73,7 +73,7 @@ else
                         }
                     </div>
                 </div>
-                <span class="tc nowrap">@Ui.Time(task.CreatedAtUtc)</span>
+                <span class="tc nowrap">耗时 @Ui.Elapsed(task)<br />@Ui.Time(task.CreatedAtUtc)</span>
                 <div class="item-actions">
                     <button type="button" class="icon-btn danger" title="删除任务及物料" aria-label="删除任务及物料"
                             disabled="@Busy" @onclick="() => Delete(task)">

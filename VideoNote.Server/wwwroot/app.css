@@ -967,3 +967,16 @@ textarea.form-control { resize: vertical; min-height: 2.5rem; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* Generated reports keep semantic Markdown while fitting narrow screens. */
+.markdown-content { line-height: 1.8; overflow-wrap: anywhere; }
+.markdown-content > :first-child { margin-top: 0; }
+.markdown-content h1, .markdown-content h2, .markdown-content h3 { margin: 1.2em 0 .5em; }
+.markdown-content pre { overflow-x: auto; padding: 1rem; background: rgba(127,127,127,.1); border-radius: 8px; }
+.markdown-content code { font-size: .9em; }
+.markdown-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.markdown-content th, .markdown-content td { border: 1px solid var(--border); padding: .5rem; }
+.markdown-content blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid #b58751; }
+.task-logs { padding-left: 1.4rem; }
+.task-logs li { padding: .3rem 0; }
+.task-logs time { margin-right: 1rem; }
