@@ -33,8 +33,8 @@ public sealed class ConversationService(VideoNoteDbContext db, IModelChatClientF
         List<ChatMessage> messages = [new(ChatRole.System, context)];
         messages.AddRange(history.Select(m => new ChatMessage(m.Role == ConversationRole.User ? ChatRole.User : ChatRole.Assistant, m.Content)));
         messages.Add(new(ChatRole.User, question.Trim()));
-        var budget = messages.Sum(m => (long)Encoding.UTF8.GetByteCount(m.Text) + 32);
-        if (budget + options.Value.MaxOutputTokens + 512 > model.ContextWindow * 0.9)
+        var budget = messages.Sum(m => (long)AnalysisBudget.Size(m.Text) + 32);
+        if (budget > AnalysisBudget.AvailableInput(model.ContextWindow, options.Value.MaxOutputTokens))
             throw new ConversationException("完整报告、分段与对话历史超出模型上下文限制，请在设置中选择更大上下文的模型；内容未被截断。");
         using var client = await clients.CreateAsync(model.Id, ct);
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions { Name = "VideoNote Assistant", UseProvidedChatClientAsIs = true });

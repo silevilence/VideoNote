@@ -39,6 +39,19 @@ public sealed class TaskCreationTests
         Assert.Empty((await http.GetFromJsonAsync<TaskDto[]>("/api/tasks"))!);
     }
 
+    [Fact]
+    public async Task Unknown_model_is_rejected_before_task_is_created()
+    {
+        await using var app = new ApiFactory();
+        using var http = app.CreateClient();
+        using var body = Upload(new() { FileName = "invalid.mp4", Mode = AnalysisMode.Subtitles,
+            ModelConfigId = Guid.NewGuid() });
+        var response = await http.PostAsync("/api/tasks/upload", body);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("所选模型不存在", await response.Content.ReadAsStringAsync());
+        Assert.Empty((await http.GetFromJsonAsync<TaskDto[]>("/api/tasks"))!);
+    }
+
     private static MultipartFormDataContent Upload(CreateTaskInput input)
     {
         var form = new MultipartFormDataContent();

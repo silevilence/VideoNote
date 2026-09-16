@@ -70,7 +70,7 @@ public sealed class AnalysisProgressWriter(IServiceScopeFactory scopes, Analysis
     private static void AppendLog(AnalysisTask task)
     {
         var logs = JsonSerializer.Deserialize<List<TaskLogDto>>(task.LogsJson) ?? [];
-        if (logs.Count == 0) logs.Add(new(task.CreatedAtUtc, AnalysisTaskStatus.Queued, 0, "排队等待分析"));
+        if (logs.Count == 0) logs.Add(new(task.CreatedAtUtc, AnalysisTaskStatus.Queued, 0, AnalysisStages.Queued));
         var entry = new TaskLogDto(DateTime.UtcNow, task.Status, task.ProgressPercent, task.StageDescription ?? "");
         if (logs[^1].Status != entry.Status || logs[^1].Description != entry.Description || logs[^1].ProgressPercent != entry.ProgressPercent)
             logs.Add(entry);

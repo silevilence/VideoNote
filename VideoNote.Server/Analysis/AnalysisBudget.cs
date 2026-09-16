@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.Extensions.Options;
 namespace VideoNote.Server.Analysis;
 
 public sealed class PipelineOptions
@@ -18,11 +17,15 @@ public sealed class AnalysisBudget
     public AnalysisBudget(int contextWindow, string prompt, PipelineOptions options)
     {
         Output = Math.Min(options.MaxOutputTokens, contextWindow / 4);
-        // UTF-8 bytes conservatively bound text token usage; reserve headroom for protocol and instructions.
-        Input = (int)(contextWindow * 0.75) - Output - Encoding.UTF8.GetByteCount(prompt) - 512;
-        if (Input < 512 || Output < 128)
+        var input = AvailableInput(contextWindow, Output) - Size(prompt);
+        if (input < 512 || Output < 128)
             throw new AnalysisException("模型上下文窗口过小或提示词过长，请调整模型窗口或缩短提示词。");
+        Input = (int)input;
     }
+    // UTF-8 bytes conservatively bound text token usage; reserve headroom for protocol and instructions.
+    public static long AvailableInput(int contextWindow, int outputTokens) =>
+        (long)(contextWindow * 0.75) - outputTokens - 512;
+
     public static int Size(string text) => Encoding.UTF8.GetByteCount(text);
     public static IEnumerable<string> Split(string text, int bytes)
     {

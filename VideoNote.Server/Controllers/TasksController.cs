@@ -59,12 +59,11 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
 
     private async Task<ActionResult<TaskDto>> CreateCore(CreateTaskInput input, Stream body, long? length, CancellationToken ct)
     {
-        if (input.ModelConfigId is null) return BadRequest(new { message = "请选择分析模型。" });
-        var selectedModel = input.ModelConfigId is { } modelId
-            ? await db.ModelConfigs.AsNoTracking().SingleOrDefaultAsync(m => m.Id == modelId, ct) : null;
-        if (input.ModelConfigId.HasValue && selectedModel is null)
+        if (input.ModelConfigId is not { } modelId) return BadRequest(new { message = "请选择分析模型。" });
+        var selectedModel = await db.ModelConfigs.AsNoTracking().SingleOrDefaultAsync(m => m.Id == modelId, ct);
+        if (selectedModel is null)
             return BadRequest(new { message = "所选模型不存在。" });
-        if (selectedModel is not null && !input.AllowCapabilityOverride &&
+        if (!input.AllowCapabilityOverride &&
             !ModelCapabilityRules.Matches(input.Mode, selectedModel.SupportsImage, selectedModel.SupportsVideo))
             return BadRequest(new { message = $"所选模型未声明{ModelCapabilityRules.RequiredCapability(input.Mode)}能力；请更换模型或显式启用手动覆盖。" });
         if (input.PromptTemplateId.HasValue && !await db.PromptTemplates.AnyAsync(p => p.Id == input.PromptTemplateId, ct))
@@ -77,7 +76,7 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
             ModelConfigId = input.ModelConfigId,
             PromptTemplateId = input.PromptTemplateId,
             PromptContentSnapshot = input.PromptContent is null ? prompt?.Content : string.IsNullOrWhiteSpace(input.PromptContent) ? null : input.PromptContent.Trim(),
-            StageDescription = "排队等待分析"
+            StageDescription = AnalysisStages.Queued
         };
         try
         {

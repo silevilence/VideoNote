@@ -77,6 +77,64 @@ public sealed class ConversationTests
         if (failure == "budget") Assert.Equal(0, mock.ChatCalls);
     }
 
+    [Theory]
+    [InlineData('x', 2000, true)]
+    [InlineData('x', 4000, false)]
+    [InlineData('中', 2000, false)]
+    public async Task Context_budget_reserves_shared_headroom_and_counts_utf8(char character, int length, bool accepted)
+    {
+        await using var mock = await ProtocolEndpoint.Start();
+        await using var app = new ApiFactory(); using var http = app.CreateClient();
+        var (id, _) = await Seed(app, mock, window: 8192);
+        var question = new string(character, length);
+        var events = await Ask(http, id, question);
+        Assert.Equal(accepted ? "done" : "error", events[^1].Type);
+        var history = (await http.GetFromJsonAsync<List<ConversationMessageDto>>($"api/tasks/{id}/conversation"))!;
+        if (accepted)
+        {
+            Assert.Equal(2, history.Count);
+            Assert.Equal(question, history[0].Content);
+        }
+        else
+        {
+            Assert.Contains("内容未被截断", events[^1].Text);
+            Assert.Equal(0, mock.ChatCalls);
+            Assert.Empty(history);
+        }
+    }
+
+    [Fact]
+    public async Task Output_reservation_larger_than_context_is_rejected_without_integer_overflow()
+    {
+        await using var mock = await ProtocolEndpoint.Start();
+        await using var app = new ApiFactory(new() { ["Conversation:MaxOutputTokens"] = int.MaxValue.ToString() });
+        using var http = app.CreateClient();
+        var (id, _) = await Seed(app, mock, window: 512);
+        var events = await Ask(http, id, "question");
+        Assert.Equal("error", events[^1].Type);
+        Assert.Contains("内容未被截断", events[^1].Text);
+        Assert.Equal(0, mock.ChatCalls);
+        Assert.Empty((await http.GetFromJsonAsync<List<ConversationMessageDto>>($"api/tasks/{id}/conversation"))!);
+    }
+
+    [Fact]
+    public async Task Context_budget_includes_history_and_preserves_previous_turn_on_rejection()
+    {
+        await using var mock = await ProtocolEndpoint.Start();
+        await using var app = new ApiFactory(); using var http = app.CreateClient();
+        var (id, _) = await Seed(app, mock, window: 8192);
+        var question = new string('x', 2500);
+        Assert.Equal("done", (await Ask(http, id, question))[^1].Type);
+        var calls = mock.ChatCalls;
+        var events = await Ask(http, id, new string('y', 1500));
+        Assert.Equal("error", events[^1].Type);
+        Assert.Contains("内容未被截断", events[^1].Text);
+        Assert.Equal(calls, mock.ChatCalls);
+        var history = (await http.GetFromJsonAsync<List<ConversationMessageDto>>($"api/tasks/{id}/conversation"))!;
+        Assert.Equal(2, history.Count);
+        Assert.Equal(question, history[0].Content);
+    }
+
     [Fact]
     public async Task Timeout_blocks_overlap_and_delete_then_releases_admission()
     {

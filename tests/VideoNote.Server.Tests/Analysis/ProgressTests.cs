@@ -26,6 +26,7 @@ public sealed class ProgressTests
         var result = await WorkerTests.WaitFor(http, task.Id, AnalysisTaskStatus.Canceled);
         Assert.Equal(50, result.ProgressPercent);
         Assert.Null(result.ResultText);
+        Assert.Equal(task.StageDescription, result.Logs![0].Description);
         Assert.Equal(new[] { "排队等待分析", "prepare", "map", "canceled" }, result.Logs!.Select(l => l.Description));
         Assert.Equal(50, result.Logs![^1].ProgressPercent);
         await progress.UpdateAsync(Guid.NewGuid(), AnalysisTaskStatus.Preprocessing, 1, "missing");
