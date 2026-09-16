@@ -95,7 +95,7 @@
             {
                 var info = Ui.ModeInfo(mode);
                 <select id="task-model" class="form-select" disabled="@(Busy || uploading)" @bind="modelId">
-                    <option value="">暂不指定</option>
+                    <option value="">请选择模型</option>
                     @foreach (var m in visibleModels)
                     {
                         <option value="@m.Id">@ModelLabel(m)</option>
@@ -121,21 +121,17 @@
         </div>
         <div class="field" style="margin-bottom:0;">
             <label for="task-prompt">提示词模板</label>
-            <select id="task-prompt" class="form-select" disabled="@(Busy || uploading)" @bind="promptId">
+            <select id="task-prompt" class="form-select" disabled="@(Busy || uploading)" @bind="promptId" @bind:after="SelectPrompt">
                 <option value="">不使用模板</option>
                 @foreach (var p in prompts)
                 {
                     <option value="@p.Id">@p.Name@(p.IsBuiltIn ? "（内置）" : "")</option>
                 }
             </select>
-            @if (prompts.FirstOrDefault(p => p.Id.ToString() == promptId) is { } selectedPrompt)
-            {
-                <div class="preview-box" style="margin-top:0.6rem;"><pre>@selectedPrompt.Content</pre></div>
-            }
-            else
-            {
-                <p class="hint">不选模板时建议在提示词模板页复制一份内置模板再调整。<a href="prompts">管理模板 →</a></p>
-            }
+            <label for="task-prompt-content" style="margin-top:0.6rem;">本次任务提示词</label>
+            <textarea id="task-prompt-content" class="form-control" rows="8" maxlength="16000"
+                      disabled="@(Busy || uploading)" @bind="promptContent" @bind:event="oninput"></textarea>
+            <p class="hint">可直接编辑，最多 16000 字符；仅保存到本次任务，不修改模板。留空使用默认报告要求。</p>
         </div>
     </div>
 
@@ -147,7 +143,7 @@
         <div class="kv-grid" style="margin-bottom:1rem;">
             <div><div class="kv-key">视频</div><div class="kv-val">@(selected?.Name ?? "未选择")</div></div>
             <div><div class="kv-key">模式</div><div class="kv-val">@Ui.ModeName(mode)</div></div>
-            <div><div class="kv-key">模型</div><div class="kv-val">@(SelectedModel?.ModelId ?? "暂不指定")</div></div>
+            <div><div class="kv-key">模型</div><div class="kv-val">@(SelectedModel?.ModelId ?? "请选择模型")</div></div>
             <div><div class="kv-key">提示词</div><div class="kv-val">@(SelectedPrompt?.Name ?? "不使用")</div></div>
         </div>
         @if (uploading)
@@ -179,6 +175,8 @@
     private AnalysisMode mode = AnalysisMode.SampledFrames;
     private string? modelId;
     private string? promptId;
+    private string promptContent = "";
+    private void SelectPrompt() => promptContent = SelectedPrompt?.Content ?? "";
     private bool showAllModels;
     private SelectedFile? selected;
     private string? uploadError;
@@ -252,8 +250,11 @@
                 uploadError = "视频扩展名不受支持。";
                 return;
             }
+            if (SelectedModel is null) { uploadError = "请选择分析模型。"; return; }
+            if (promptContent.Length > 16000) { uploadError = "提示词最多 16000 字符。"; return; }
             var created = await module.InvokeAsync<TaskDto>("upload", fileInput,
-                new { mode = mode.ToString(), modelConfigId = modelId, promptTemplateId = promptId,
+                new { mode = (int)mode, modelConfigId = modelId, promptTemplateId = string.IsNullOrEmpty(promptId) ? null : promptId,
+                    promptContent = string.IsNullOrWhiteSpace(promptContent) ? "" : promptContent,
                     allowCapabilityOverride = showAllModels && SelectedModel is { } chosen && !Ui.ModelMatches(chosen, mode) }, receiver);
             Nav.NavigateTo($"tasks/{created.Id}");
         }

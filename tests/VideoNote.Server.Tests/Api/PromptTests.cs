@@ -56,7 +56,7 @@ public sealed class PromptTests
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/prompts/{copy.Id}", update)).StatusCode);
         using var content = new ByteArrayContent([1, 2, 3]);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        response = await client.PostAsync($"/api/tasks?fileName=prompt.mp4&promptTemplateId={copy.Id}", content);
+        response = await client.PostAsync($"/api/tasks?mode=Subtitles&modelConfigId=20000000-0000-0000-0000-000000000002&fileName=prompt.mp4&promptTemplateId={copy.Id}", content);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var task = (await response.Content.ReadFromJsonAsync<TaskDto>())!;
         update.Content = "Changed later";

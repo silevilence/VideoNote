@@ -66,7 +66,7 @@ public sealed class WorkerTests
     {
         using var content = new ByteArrayContent([1, 2, 3]);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        var response = await http.PostAsync("/api/tasks?fileName=test.mp4", content);
+        var response = await http.PostAsync("/api/tasks?mode=Subtitles&modelConfigId=20000000-0000-0000-0000-000000000002&fileName=test.mp4", content);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<TaskDto>())!;
     }

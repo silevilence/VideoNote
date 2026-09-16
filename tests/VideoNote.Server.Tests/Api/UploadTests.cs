@@ -40,7 +40,7 @@ public sealed class UploadTests
         await using var input = File.OpenRead(source);
         using var content = new StreamContent(input);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        var response = await client.PostAsync("/api/tasks?fileName=large.mp4&mode=SampledFrames", content);
+        var response = await client.PostAsync("/api/tasks?mode=Subtitles&modelConfigId=20000000-0000-0000-0000-000000000002&fileName=large.mp4", content);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var task = (await response.Content.ReadFromJsonAsync<TaskDto>())!;
         string savedPath;
@@ -84,7 +84,7 @@ public sealed class UploadTests
         using var client = app.CreateClient(new() { AllowAutoRedirect = false });
         using HttpContent content = chunked ? new UnknownLengthContent(new byte[size]) : new ByteArrayContent(new byte[size]);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        var response = await client.PostAsync("/api/tasks?fileName=" + Uri.EscapeDataString(name), content);
+        var response = await client.PostAsync("/api/tasks?mode=Subtitles&modelConfigId=20000000-0000-0000-0000-000000000002&fileName=" + Uri.EscapeDataString(name), content);
         Assert.Equal(status, (int)response.StatusCode);
         Assert.Empty((await client.GetFromJsonAsync<TaskDto[]>("/api/tasks"))!);
         Assert.Empty(Directory.EnumerateFiles(app.Services.GetRequiredService<WorkDirectoryPaths>().Videos, "*", SearchOption.AllDirectories));

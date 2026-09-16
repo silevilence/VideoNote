@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Net.Http.Headers;
+using System.Text.Json;
 using VideoNote.Server.Analysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -29,7 +32,33 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
 
     [HttpPost, Consumes("application/octet-stream"), DisableRequestSizeLimit]
     public async Task<ActionResult<TaskDto>> Create([FromQuery] CreateTaskInput input, CancellationToken ct)
+        => await CreateCore(input, Request.Body, Request.ContentLength, ct);
+
+    // Read metadata first, then stream the file directly; never bind IFormFile or buffer the video.
+    [HttpPost("upload"), Consumes("multipart/form-data"), DisableRequestSizeLimit, StreamingUpload]
+    public async Task<ActionResult<TaskDto>> Upload(CancellationToken ct)
     {
+        try
+        {
+            var boundary = HeaderUtilities.RemoveQuotes(MediaTypeHeaderValue.Parse(Request.ContentType!).Boundary).Value;
+            if (string.IsNullOrEmpty(boundary) || boundary.Length > 128) return BadRequest(new { message = "上传边界无效。" });
+            var reader = new MultipartReader(boundary, Request.Body) { BodyLengthLimit = 128 * 1024 };
+            var metadata = await reader.ReadNextSectionAsync(ct);
+            if (metadata?.AsFormDataSection()?.Name != "metadata") return BadRequest(new { message = "上传缺少任务参数。" });
+            var input = await JsonSerializer.DeserializeAsync<CreateTaskInput>(metadata.Body, new JsonSerializerOptions(JsonSerializerDefaults.Web), ct);
+            if (input is null || !TryValidateModel(input)) return BadRequest(new { message = "任务参数无效，提示词最多 16000 字符。" });
+            reader.BodyLengthLimit = options.Value.MaxBytes;
+            var file = await reader.ReadNextSectionAsync(ct);
+            if (file?.AsFileSection()?.Name != "video") return BadRequest(new { message = "上传缺少视频。" });
+            return await CreateCore(input, file.Body, null, ct);
+        }
+        catch (JsonException) { return BadRequest(new { message = "任务参数格式无效。" }); }
+        catch (InvalidDataException) { return BadRequest(new { message = "上传格式无效或内容超过限制。" }); }
+    }
+
+    private async Task<ActionResult<TaskDto>> CreateCore(CreateTaskInput input, Stream body, long? length, CancellationToken ct)
+    {
+        if (input.ModelConfigId is null) return BadRequest(new { message = "请选择分析模型。" });
         var selectedModel = input.ModelConfigId is { } modelId
             ? await db.ModelConfigs.AsNoTracking().SingleOrDefaultAsync(m => m.Id == modelId, ct) : null;
         if (input.ModelConfigId.HasValue && selectedModel is null)
@@ -46,12 +75,12 @@ public sealed class TasksController(VideoNoteDbContext db, VideoFileStore files,
             Mode = input.Mode,
             ModelConfigId = input.ModelConfigId,
             PromptTemplateId = input.PromptTemplateId,
-            PromptContentSnapshot = prompt?.Content,
+            PromptContentSnapshot = input.PromptContent is null ? prompt?.Content : string.IsNullOrWhiteSpace(input.PromptContent) ? null : input.PromptContent.Trim(),
             StageDescription = "排队等待分析"
         };
         try
         {
-            task.VideoPath = await files.SaveAsync(task.Id, input.FileName, Request.Body, Request.ContentLength, ct);
+            task.VideoPath = await files.SaveAsync(task.Id, input.FileName, body, length, ct);
             db.AnalysisTasks.Add(task);
             await db.SaveChangesAsync(ct);
             queue.Enqueue(task.Id);

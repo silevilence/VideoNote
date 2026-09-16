@@ -34,9 +34,9 @@ public sealed class UploadConfigurationTests
         var limits = await client.GetFromJsonAsync<UploadLimits>("/api/tasks/upload-limits");
         Assert.Equal(new[] { ".custom" }, limits!.AllowedExtensions);
         using var rejected = new ByteArrayContent([1, 2, 3]);
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/tasks?fileName=test.mp4", rejected)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/tasks?mode=Subtitles&modelConfigId=20000000-0000-0000-0000-000000000002&fileName=test.mp4", rejected)).StatusCode);
         using var accepted = new ByteArrayContent([1, 2, 3]);
-        Assert.Equal(HttpStatusCode.Created, (await client.PostAsync("/api/tasks?fileName=test.custom", accepted)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsync("/api/tasks?mode=Subtitles&modelConfigId=20000000-0000-0000-0000-000000000002&fileName=test.custom", accepted)).StatusCode);
     }
 
     private sealed record UploadLimits(long MaxBytes, string[] AllowedExtensions);

@@ -4,14 +4,12 @@ export function upload(input, metadata, receiver) {
     if (!file) return Promise.reject(new Error("请先选择视频。"));
     if (active.has(input)) return Promise.reject(new Error("正在上传。"));
     return new Promise((resolve, reject) => {
-        const query = new URLSearchParams({fileName: file.name, mode: metadata.mode});
-        if (metadata.modelConfigId) query.set("modelConfigId", metadata.modelConfigId);
-        if (metadata.allowCapabilityOverride) query.set("allowCapabilityOverride", "true");
-        if (metadata.promptTemplateId) query.set("promptTemplateId", metadata.promptTemplateId);
+        const body = new FormData();
+        body.append("metadata", JSON.stringify({...metadata, fileName: file.name}));
+        body.append("video", file);
         const xhr = new XMLHttpRequest();
         active.set(input, xhr);
-        xhr.open("POST", "api/tasks?" + query);
-        xhr.setRequestHeader("Content-Type", "application/octet-stream");
+        xhr.open("POST", "api/tasks/upload");
         let last = 0;
         xhr.upload.onprogress = e => {
             if (e.lengthComputable && (Date.now() - last > 100 || e.loaded === e.total)) {
@@ -30,7 +28,7 @@ export function upload(input, metadata, receiver) {
             else reject(new Error(body.message || Object.values(body.errors || {}).flat().join(" ") || "上传失败（" + xhr.status + "）。"));
         };
         // Native File body: browser streams from disk; video bytes never cross the WASM boundary.
-        try { xhr.send(file); }
+        try { xhr.send(body); }
         catch { fail("无法开始上传，请重试。"); }
     });
 }

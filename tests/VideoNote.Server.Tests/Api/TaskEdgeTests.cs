@@ -27,7 +27,7 @@ public sealed class TaskEdgeTests
         }
         using var bytes = new ByteArrayContent([1, 2, 3]);
         bytes.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        var task = (await (await client.PostAsync("/api/tasks?fileName=task.mp4", bytes)).Content.ReadFromJsonAsync<TaskDto>())!;
+        var task = (await (await client.PostAsync("/api/tasks?mode=Subtitles&modelConfigId=20000000-0000-0000-0000-000000000002&fileName=task.mp4", bytes)).Content.ReadFromJsonAsync<TaskDto>())!;
         string path;
         using (var scope = app.Services.CreateScope())
         {
