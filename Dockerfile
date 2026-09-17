@@ -11,7 +11,8 @@ RUN dotnet restore VideoNote.Server/VideoNote.Server.csproj
 COPY VideoNote.Server/ VideoNote.Server/
 COPY VideoNote.Client/ VideoNote.Client/
 COPY VideoNote.Shared/ VideoNote.Shared/
-RUN dotnet publish VideoNote.Server -c Release --no-restore -o /out /p:UseAppHost=false
+RUN dotnet publish VideoNote.Server -c Release --no-restore -o /out /p:UseAppHost=false \
+    && test -s /out/wwwroot/_framework/blazor.web.js
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS final
 WORKDIR /app

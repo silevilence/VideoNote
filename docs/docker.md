@@ -58,6 +58,26 @@ Compose 固定项目名称为 `videonote`，默认创建命名卷 `videonote_vid
 
 普通 `docker compose down` 会移除容器但保留命名卷；**不要使用 `docker compose down -v`**，它会删除数据卷。若由已有 Windows 部署迁移，须停服后复制完整 `work`，修正容器目录权限，并在 Linux 环境另行验证旧任务物料访问与密钥解密。
 
+## 首页空白与启动脚本 404
+
+2026-09-17 已确认已发布的 `0.1.0/latest` 镜像缺少 `wwwroot/_framework/blazor.web.js`，静态资源清单也没有对应路由。运行从 GHCR 镜像提取的原始应用文件时，启动脚本返回 HTTP 404，首页只剩背景；`dotnet.*.js` 的 preload 未使用警告是启动失败的后续现象。此问题不是端口映射或数据库卷导致的。
+
+Dockerfile 在复制 Razor 源文件前先复制 csproj 并 restore，而 .NET 10 SDK 默认根据 `.razor` 文件判断是否引入 `Microsoft.AspNetCore.App.Internal.Assets`。初次还原未引入该依赖，随后 `publish --no-restore` 不会补齐。服务端项目现显式设置 `RequiresAspNetWebAssets=true`，Docker 发布步骤也会检查启动脚本非空，缺失即构建失败。
+
+修复尚未发布到 GHCR；在修复镜像发布前，仅重复拉取旧 `latest` 无效。如需自行重建，取得包含修复的完整源码，在仓库根目录执行 `docker build -t videonote:local-fix .`，将现有 Compose 服务的 `image` 改为 `videonote:local-fix`，再执行 `docker compose up -d`。保持原部署目录、项目名称与卷挂载不变，升级前按上一节备份数据。这里没有在本机执行 Docker 构建或 NAS 更新。
+
+可在有 .NET SDK 的开发环境验证还原和发布启动（浏览器脚本依赖 `work-tests/browser/node_modules/playwright` 和 Edge）：
+
+```powershell
+python -m unittest discover -s tests/deployment -v
+dotnet publish VideoNote.Server -c Release -o work-tests/startup-publish
+node tests/browser/startup.cjs work-tests/startup-publish
+```
+
+浏览器脚本启动独立 Production 进程、使用临时工作目录和随机端口，逐项检查静态清单的所有 URL 与编码变体、gzip/Brotli 内容及主要页面，结束时清理自己的进程与数据。视频管线浏览器回归可设置 `VIDEONOTE_PUBLISH_DIR` 指向待检查的发布目录，再运行 `node tests/browser/pipeline.cjs`。
+
+2026-09-17 扩大复查确认：原镜像共缺少 `blazor.web.js`、`blazor.server.js` 及各自的 gzip/Brotli 文件，均已由同一依赖修复补齐；没有发现其它发布文件遗漏。修复产物的 235 个静态文件、777 种 HTTP 响应和本地模拟端点的完整浏览器管线均通过，详见[发布文件完整性复查](verification-docker-assets-2026-09-17.md)。此验证不等同于 Linux 容器运行和 NAS 实测。
+
 ## 本次本机验证（2026-09-16）
 
 - `dotnet publish VideoNote.Server -c Release -o work-tests/docker-publish /p:UseAppHost=false` 退出码 0；核对入口 DLL、运行时配置（`net10.0`）、静态资源清单、WASM 文件、上传脚本及 Linux x64/ARM64 SQLite 原生库存在。

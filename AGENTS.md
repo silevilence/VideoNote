@@ -10,7 +10,9 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 
 仓库根目录已交付容器部署文件 `Dockerfile`、`.dockerignore`、`compose.yaml` 与说明 `docs/docker.md`。本机无 Docker；`V0.1.0` 已在 GitHub Actions 完成 Linux amd64 镜像构建（含 FFmpeg 自检）、GHCR 推送与 Release 创建，证据见 `docs/release.md`。容器启动及容器内主链路未实测，不得宣称通过。
 
-版本为 `0.1.0`：应用版本声明在 `VideoNote.Server/VideoNote.Server.csproj`，用户可见变更记录在 `changelog.md`。版本 Tag 自动发布已实现在 `.github/workflows/release.yml`：推送 `V0.1.0` 形态 tag → 从 changelog 提取对应版本段落，缺失即失败 → 推送 GHCR 镜像 → 创建 Release。仅使用 `GITHUB_TOKEN`，本机可运行 `python -m unittest discover -s tests/release-tests -v` 验证发布说明校验；真实发布验收状态见 `docs/release.md`。
+2026-09-17 排查发现已发布的 `0.1.0/latest` 镜像缺少 `blazor.web.js`，已通过提取镜像应用文件在本机运行复现启动脚本 404 与首页空白。仓库修复为 Server 显式声明 `RequiresAspNetWebAssets=true`，使 Docker 的 csproj-only restore 包含 Blazor Web 资源；不要移除此属性。构建增加脚本非空检查，回归见 `tests/deployment/test_docker_restore.py` 与 `tests/browser/startup.cjs`。修复已并入 `0.1.1`，修复镜像尚未发布，NAS 恢复尚未验证。
+
+版本为 `0.1.1`：应用版本声明在 `VideoNote.Server/VideoNote.Server.csproj`，用户可见变更记录在 `changelog.md`。版本 Tag 自动发布已实现在 `.github/workflows/release.yml`：推送 `V0.1.0` 形态 tag → 从 changelog 提取对应版本段落，缺失即失败 → 推送 GHCR 镜像 → 创建 Release。仅使用 `GITHUB_TOKEN`，本机可运行 `python -m unittest discover -s tests/release-tests -v` 验证发布说明校验；真实发布验收状态见 `docs/release.md`。
 
 文档索引：启动、发布与容器用法见 `README.md`；配置项、密钥、备份与恢复见 `docs/configuration.md`；容器部署与验证步骤见 `docs/docker.md`；任务与验收标准见 `ROADMAP.md`；历史验收证据见 `docs/review-*.md`、`docs/verification.md`、`docs/coverage-2026-09-16.md`。
 

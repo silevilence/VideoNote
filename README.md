@@ -68,6 +68,8 @@ dotnet VideoNote.Server.dll --urls http://127.0.0.1:5132
 
 ## Docker 部署示例
 
+已发布的 `0.1.0/latest` 镜像存在首页空白问题：缺少 Blazor 启动脚本，`/_framework/blazor.web.js` 返回 404。仓库已修复构建依赖，尚未发布修复镜像；当前标签重复拉取不能解决。原因、验证与本地重建方式见 [Docker 故障排查](docs/docker.md#首页空白与启动脚本-404)。
+
 仓库提供 [Dockerfile](Dockerfile) 和单服务 [compose.yaml](compose.yaml)，使用本仓库 GHCR 镜像 `ghcr.io/silevilence/videonote`。推送 `V0.1.0` 形式的版本 tag 后，Actions 校验 changelog、构建并推送 `0.1.0` 镜像，再创建 GitHub Release 并同步 `latest`。Compose 默认使用 `latest`，可通过 `VIDEONOTE_VERSION` 固定版本；详见[版本发布与验证状态](docs/release.md)。须等待对应发布成功后再拉取镜像。容器启动与容器内主链路仍需按 [Docker 部署与验证](docs/docker.md) 验收。
 
 在已安装 Docker Engine 和 Compose v2 的主机，将 `compose.yaml` 放入固定的部署目录，在该目录的 PowerShell 7 执行：

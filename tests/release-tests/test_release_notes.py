@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -31,13 +32,17 @@ class ReleaseNotesTests(unittest.TestCase):
                     github_output.read_text(encoding="utf-8") if github_output.exists() else None)
 
     def test_repository_release_and_case_insensitive_tag(self):
-        expected = (ROOT / "changelog.md").read_text(encoding="utf-8").split("## V0.1.0", 1)[1]
-        for tag in ("V0.1.0", "v0.1.0"):
+        changelog = (ROOT / "changelog.md").read_text(encoding="utf-8")
+        start = changelog.index("## V0.1.1")
+        following = re.search(r"^##[ \t]", changelog[start + 3:], re.MULTILINE)
+        section = changelog[start:start + 3 + following.start()] if following else changelog[start:]
+        expected = section.strip() + "\n"
+        for tag in ("V0.1.1", "v0.1.1"):
             with self.subTest(tag=tag):
                 result, notes, outputs = self.run_script(tag)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(notes, "## V0.1.0" + expected.rstrip() + "\n")
-                self.assertEqual(outputs, "version=0.1.0\n")
+                self.assertEqual(notes, expected)
+                self.assertEqual(outputs, "version=0.1.1\n")
 
     def test_missing_version_fails_before_writing_outputs(self):
         result, notes, outputs = self.run_script("V9.9.9")

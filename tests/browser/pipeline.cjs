@@ -37,7 +37,7 @@ const assert = require('node:assert/strict');
   setTimeout(()=>{if(!res.destroyed)res.end(frame(' complete.','stop')+'data: [DONE]\n\n');},2000);
  });
  await new Promise(r=>mock.listen(0,'127.0.0.1',r));
- const dir=path.resolve('work-tests/pipeline-publish');
+ const dir=path.resolve(process.env.VIDEONOTE_PUBLISH_DIR || 'work-tests/pipeline-publish');
  const port=5196, base='http://127.0.0.1:'+port;
  const log=fs.openSync('work-tests/browser/pipeline-server.log','w');
  const server=spawn('dotnet',['VideoNote.Server.dll','--urls',base],{cwd:dir,windowsHide:true,stdio:['ignore',log,log],
