@@ -15,7 +15,7 @@
 
 ## 使用已发布的 GHCR 镜像
 
-需要 Linux 容器运行环境与 Docker Compose v2。把 `compose.yaml` 放在固定部署目录，在该目录执行。镜像地址为 `ghcr.io/silevilence/videonote`，默认镜像标签为 `latest`；可用 `VIDEONOTE_VERSION=0.1.0` 固定版本（没有 `v` 前缀）。若镜像尚未发布或当前用户没有包读取权限，拉取会失败，须先完成发布或登录有权限的 GHCR 账号。
+需要 Linux 容器运行环境与 Docker Compose v2。把 `compose.yaml` 放在固定部署目录，在该目录执行。镜像地址为 `ghcr.io/silevilence/videonote`，默认镜像标签为 `latest`；可用 `VIDEONOTE_VERSION=0.1.1` 固定版本（没有 `v` 前缀；`0.1.0` 缺少 Blazor 启动脚本）。若镜像尚未发布或当前用户没有包读取权限，拉取会失败，须先完成发布或登录有权限的 GHCR 账号。
 
 PowerShell 7：
 
@@ -64,7 +64,7 @@ Compose 固定项目名称为 `videonote`，默认创建命名卷 `videonote_vid
 
 Dockerfile 在复制 Razor 源文件前先复制 csproj 并 restore，而 .NET 10 SDK 默认根据 `.razor` 文件判断是否引入 `Microsoft.AspNetCore.App.Internal.Assets`。初次还原未引入该依赖，随后 `publish --no-restore` 不会补齐。服务端项目现显式设置 `RequiresAspNetWebAssets=true`，Docker 发布步骤也会检查启动脚本非空，缺失即构建失败。
 
-修复尚未发布到 GHCR；在修复镜像发布前，仅重复拉取旧 `latest` 无效。如需自行重建，取得包含修复的完整源码，在仓库根目录执行 `docker build -t videonote:local-fix .`，将现有 Compose 服务的 `image` 改为 `videonote:local-fix`，再执行 `docker compose up -d`。保持原部署目录、项目名称与卷挂载不变，升级前按上一节备份数据。这里没有在本机执行 Docker 构建或 NAS 更新。
+修复已随 `0.1.1` 发布，`latest` 与 `0.1.1` 指向同一镜像，`0.1.0` 仍然缺少启动脚本。已按 `latest` 或 `0.1.1` 更新的部署无需重建；仅在必须留在 `0.1.0` 时，才按下述方式自行重建：取得包含修复的完整源码，在仓库根目录执行 `docker build -t videonote:local-fix .`，将现有 Compose 服务的 `image` 改为 `videonote:local-fix`，再执行 `docker compose up -d`。保持原部署目录、项目名称与卷挂载不变，升级前按上一节备份数据。这里没有在本机执行 Docker 构建或 NAS 更新。
 
 可在有 .NET SDK 的开发环境验证还原和发布启动（浏览器脚本依赖 `work-tests/browser/node_modules/playwright` 和 Edge）：
 

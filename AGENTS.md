@@ -8,9 +8,9 @@ VideoNote — AI 视频解读工具（个人自用/自托管，无账号体系�
 
 项目已完成三层架构、提供商/模型/提示词管理、流式上传、后台队列、三种模式预处理、分段理解与报告组合。新建页支持本次任务提示词内联快照并要求选择模型；列表/详情提供实时进度、耗时、持久化分步日志、安全 Markdown 报告与取消。完成任务可通过 Microsoft.Agents.AI 单 Assistant Agent 进行流式问答，成功问答成对保存，设置页可指定全局对话模型。
 
-仓库根目录已交付容器部署文件 `Dockerfile`、`.dockerignore`、`compose.yaml` 与说明 `docs/docker.md`。本机无 Docker；`V0.1.0` 已在 GitHub Actions 完成 Linux amd64 镜像构建（含 FFmpeg 自检）、GHCR 推送与 Release 创建，证据见 `docs/release.md`。容器启动及容器内主链路未实测，不得宣称通过。
+仓库根目录已交付容器部署文件 `Dockerfile`、`.dockerignore`、`compose.yaml` 与说明 `docs/docker.md`。本机无 Docker；`V0.1.0` 与 `V0.1.1` 已在 GitHub Actions 完成 Linux amd64 镜像构建（含 FFmpeg 自检）、GHCR 推送与 Release 创建，证据见 `docs/release.md`。容器启动及容器内主链路未实测，不得宣称通过。
 
-2026-09-17 排查发现已发布的 `0.1.0/latest` 镜像缺少 `blazor.web.js`，已通过提取镜像应用文件在本机运行复现启动脚本 404 与首页空白。仓库修复为 Server 显式声明 `RequiresAspNetWebAssets=true`，使 Docker 的 csproj-only restore 包含 Blazor Web 资源；不要移除此属性。构建增加脚本非空检查，回归见 `tests/deployment/test_docker_restore.py` 与 `tests/browser/startup.cjs`。修复已并入 `0.1.1`，修复镜像尚未发布，NAS 恢复尚未验证。
+2026-09-17 排查发现已发布的 `0.1.0` 镜像缺少 `blazor.web.js`（当时 `latest` 同样指向该镜像），已通过提取镜像应用文件在本机运行复现启动脚本 404 与首页空白。仓库修复为 Server 显式声明 `RequiresAspNetWebAssets=true`，使 Docker 的 csproj-only restore 包含 Blazor Web 资源；不要移除此属性。构建增加脚本非空检查，回归见 `tests/deployment/test_docker_restore.py` 与 `tests/browser/startup.cjs`。修复已随 `0.1.1` 发布，`latest` 指向同一摘要；容器内启动与 NAS 恢复仍未实测。
 
 版本为 `0.1.1`：应用版本声明在 `VideoNote.Server/VideoNote.Server.csproj`，用户可见变更记录在 `changelog.md`。版本 Tag 自动发布已实现在 `.github/workflows/release.yml`：推送 `V0.1.0` 形态 tag → 从 changelog 提取对应版本段落，缺失即失败 → 推送 GHCR 镜像 → 创建 Release。仅使用 `GITHUB_TOKEN`，本机可运行 `python -m unittest discover -s tests/release-tests -v` 验证发布说明校验；真实发布验收状态见 `docs/release.md`。
 

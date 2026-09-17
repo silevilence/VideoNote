@@ -51,3 +51,7 @@ node tests/browser/pipeline.cjs
 `startup.cjs` 已扩展为逐项检查静态清单响应、压缩内容和主要页面。`pipeline.cjs` 可通过 `VIDEONOTE_PUBLISH_DIR` 指定待验收产物，默认目录保持不变。浏览器测试依赖仓库约定的 Playwright、Edge；管线测试还需要 FFmpeg。
 
 本次详细对比记录位于忽略目录 `work-tests/asset-audit/`（`inventory.json`、`context-files.json`、`pipeline.log`）。这些结果不能替代 Linux 容器启动、FFmpeg 动态库加载、文件卷权限和 NAS 更新后的验收；修复镜像是否发布应以发布记录为准。
+
+## 发布后核验（V0.1.1，2026-09-17）
+
+`V0.1.1` 已发布（[发布验收](release.md#v011-发布验收2026-09-17)）。匿名读取 GHCR 时 `0.1.1` 与 `latest` manifest 摘要同为 `sha256:5201cd85ba7cda4afc9ff53f83b2fd32cc1211d5bdac7021bb67db8beb96adb4`。下载该摘要的 Linux amd64 应用层重新核对：上文列出的 6 个文件均已存在于 `app/wwwroot/_framework/`，`blazor.web.js` 为 200538 字节，该层共 222 个 `_framework` 文件；发布的镜像不再缺少启动脚本。仍未验证的是容器启动、Compose 拉取与 NAS 更新。

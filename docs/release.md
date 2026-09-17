@@ -1,6 +1,6 @@
 # 版本 Tag 自动发布
 
-2026-09-17 已确认：历史 `V0.1.0` 构建与推送虽成功，其 `0.1.0/latest` 镜像遗漏 `blazor.web.js`，导致首页空白。修复代码及本机发布启动回归已完成，修复镜像尚未发布，详情见 [Docker 故障排查](docker.md#首页空白与启动脚本-404)。下文历史构建成功记录不代表该镜像的页面可用性通过。
+2026-09-17 已确认：历史 `V0.1.0` 构建与推送虽成功，其 `0.1.0` 镜像遗漏 `blazor.web.js`，导致首页空白；该问题已随 `V0.1.1` 修复发布，`latest` 现指向修复后的摘要，验收见下文。下文历史构建成功记录不代表 `0.1.0` 旧镜像的页面可用性通过，详情见 [Docker 故障排查](docker.md#首页空白与启动脚本-404)。
 
 `.github/workflows/release.yml` 自动发布只监听三段数字版本 tag，例如 `V0.1.0`、`v0.1.0`、`V12.34.56`。普通分支推送、其他 tag 与预发布后缀不触发。大小写前缀等价，同一版本只推送一种写法。另提供手动入口，将已发布版本的镜像复制为 `latest`，不执行构建或创建 Release。
 
@@ -34,7 +34,7 @@ gh run list --workflow release.yml
 gh release view V0.1.0
 ```
 
-在 [Actions](https://github.com/silevilence/VideoNote/actions/workflows/release.yml) 等待流程完成，再按 [Docker 部署](docker.md) 拉取对应版本。Compose 默认使用 `latest`，它指向最近一次成功发布或手动指定的正式版本；补发旧版本也会更新此别名。需要固定版本时设置 `VIDEONOTE_VERSION=0.1.0`。
+在 [Actions](https://github.com/silevilence/VideoNote/actions/workflows/release.yml) 等待流程完成，再按 [Docker 部署](docker.md) 拉取对应版本。Compose 默认使用 `latest`，它指向最近一次成功发布或手动指定的正式版本；补发旧版本也会更新此别名。需要固定版本时设置 `VIDEONOTE_VERSION=0.1.1`（`0.1.0` 缺少 Blazor 启动脚本，不要固定到它）。
 
 补充或修复 `latest` 时，运行以下命令（`version` 必须是已存在的三段数字镜像版本，不带 `v`）：
 
@@ -61,5 +61,14 @@ gh workflow run release.yml --ref main -f version=0.1.0
 - [Actions 运行 35068384817](https://github.com/silevilence/VideoNote/actions/runs/35068384817) 使用手动入口 `version=0.1.0`，仅运行 `latest` 任务，构建与 Release 任务跳过；manifest 复制与内容比较通过。
 - 匿名访问 `0.1.0` 与 `latest` manifest 均返回 HTTP 200，两者摘要同为 `sha256:ad38374c55f9e55742004154808b611d752f6c2d6aacdb784e1fdb20bde63fe4`。没有重新构建镜像，`V0.1.0` Git tag 仍指向 `078893258ae7c782289b9cca6bd7c857065f32dc`。
 - Compose 默认值已改为 `latest`，保留 `VIDEONOTE_VERSION` 覆盖。PyYAML 解析与默认值核对、actionlint 工作流语法检查通过；本机未运行 Docker Compose CLI。
+
+### V0.1.1 发布验收（2026-09-17）
+
+- 发布前同步 `VideoNote.Server/VideoNote.Server.csproj` 的 `<Version>` 与 `changelog.md` 的 `## V0.1.1` 段落；`python -m unittest discover -s tests/release-tests -v` 5 组回归通过，`scripts/release-notes.py V0.1.1` 提取成功。
+- 推送 tag `V0.1.1`（轻量标签，指向 `1875db84ae5ddd28d0d97d9b0dfb1099b44d6fdf`）。[Actions 运行 35170132578](https://github.com/silevilence/VideoNote/actions/runs/35170132578) 由 tag 触发，`release` 与 `latest` 两个任务全部成功：changelog 校验 → 构建（含 `blazor.web.js` 非空检查）→ GHCR 登录 → 推送 → Release 创建 → `latest` manifest 复制与内容比较。
+- [V0.1.1 Release](https://github.com/silevilence/VideoNote/releases/tag/V0.1.1) 已正式发布（非草稿、非预发布），通过 API 读取正文并与本地提取结果比较，一致。
+- 匿名访问 `0.1.1` 与 `latest` manifest 均返回 HTTP 200，两者摘要同为 `sha256:5201cd85ba7cda4afc9ff53f83b2fd32cc1211d5bdac7021bb67db8beb96adb4`；这是注册表元数据访问验证，没有下载镜像层或启动容器。
+- 下载该摘要下的 Linux amd64 应用层并核对文件：`app/wwwroot/_framework/` 中 `blazor.web.js`（200538 字节）及其 gzip/Brotli 变体、`blazor.server.js` 三件套全部存在，即 `0.1.0` 缺失的 6 个文件已补齐；该层共 222 个 `_framework` 文件。
+- 本机无 Docker：Linux 容器启动、Compose 拉取、容器内分析/对话主链路与 NAS 恢复未验证，本次不调用真实模型。
 
 工作流语法与权限依据：[GitHub Actions 工作流语法](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)、[发布 Docker 镜像](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)、[gh release create](https://cli.github.com/manual/gh_release_create)。
